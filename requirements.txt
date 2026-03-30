@@ -1,0 +1,4 @@
+flask
+python-pptx
+Pillow
+werkzeug

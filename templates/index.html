@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Appendix A – PPTX Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #0f3460;
+    }
+
+    header p {
+      margin-top: .35rem;
+      font-size: .9rem;
+      color: #555;
+    }
+
+    /* Flash messages */
+    .flash-list { list-style: none; margin-bottom: 1.2rem; }
+    .flash-list li {
+      padding: .75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: .5rem;
+      font-size: .9rem;
+    }
+    .flash-list li.error   { background: #fde8e8; color: #c0392b; border-left: 4px solid #c0392b; }
+    .flash-list li.success { background: #e8f8e8; color: #27ae60; border-left: 4px solid #27ae60; }
+
+    /* Card sections */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #0f3460;
+      border-bottom: 2px solid #e8eaf6;
+      padding-bottom: .5rem;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .card h2 .badge {
+      background: #0f3460;
+      color: #fff;
+      border-radius: 50%;
+      width: 1.4rem;
+      height: 1.4rem;
+      font-size: .75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Grid layout for form fields */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+    @media (max-width: 600px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .field { display: flex; flex-direction: column; gap: .35rem; }
+
+    label {
+      font-size: .82rem;
+      font-weight: 600;
+      color: #333;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    label .hint {
+      font-weight: 400;
+      color: #888;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: .78rem;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    input[type="file"],
+    textarea {
+      padding: .55rem .75rem;
+      border: 1.5px solid #dde;
+      border-radius: 6px;
+      font-size: .9rem;
+      color: #1a1a2e;
+      background: #fafafa;
+      width: 100%;
+      transition: border-color .15s;
+    }
+
+    input[type="file"] { padding: .4rem .5rem; cursor: pointer; }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #0f3460;
+      background: #fff;
+    }
+
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* GA detection widget */
+    .ga-detect-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-top: .5rem;
+      flex-wrap: wrap;
+    }
+
+    #ga-detected-badge {
+      font-size: .85rem;
+      padding: .3rem .7rem;
+      border-radius: 20px;
+      background: #e8f4fd;
+      color: #0f3460;
+      font-weight: 600;
+      display: none;
+    }
+
+    #ga-detect-btn {
+      padding: .45rem 1rem;
+      background: #0f3460;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 600;
+      transition: background .15s;
+    }
+
+    #ga-detect-btn:hover { background: #16427a; }
+    #ga-detect-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+    #ga-detect-status {
+      font-size: .8rem;
+      color: #888;
+    }
+
+    /* File list preview */
+    .file-list {
+      margin-top: .5rem;
+      font-size: .8rem;
+      color: #555;
+      list-style: disc inside;
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: .5rem .75rem;
+      background: #fafafa;
+      display: none;
+    }
+
+    /* Submit button */
+    .submit-wrap {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: .5rem;
+    }
+
+    button[type="submit"] {
+      padding: .75rem 2.5rem;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+    }
+
+    button[type="submit"]:hover { background: #c73652; transform: translateY(-1px); }
+
+    /* Spinner */
+    #spinner {
+      display: none;
+      align-items: center;
+      gap: .6rem;
+      color: #555;
+      font-size: .9rem;
+      margin-right: 1rem;
+    }
+
+    .spinner-ring {
+      width: 20px; height: 20px;
+      border: 3px solid #dde;
+      border-top-color: #0f3460;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Appendix A – RF Schematics & GA Drawings Generator</h1>
+    <p>Fill in the form below to generate a P02 PPTX from the template.</p>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash-list">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" action="/generate" enctype="multipart/form-data" id="main-form">
+
+    <!-- ① Station 3D Image -->
+    <div class="card">
+      <h2><span class="badge">1</span> Station 3D Image</h2>
+      <div class="field">
+        <label>
+          3D Image file
+          <span class="hint"> — filename must follow: <code>3D_STATIONCODE_STATIONNAME.png</code></span>
+        </label>
+        <input type="file" name="image_3d" accept="image/*" required id="image-3d-input" />
+        <small id="station-preview" style="color:#0f3460;font-weight:600;margin-top:.25rem;"></small>
+      </div>
+    </div>
+
+    <!-- ② Dates -->
+    <div class="card">
+      <h2><span class="badge">2</span> Revision Dates</h2>
+      <div class="grid-2">
+        <div class="field">
+          <label>P01 Date <span class="hint">(e.g. 22/12/2022)</span></label>
+          <input type="text" name="p01_date" placeholder="DD/MM/YYYY" required />
+        </div>
+        <div class="field">
+          <label>P02 Date <span class="hint">(e.g. 08/05/2023)</span></label>
+          <input type="text" name="p02_date" placeholder="DD/MM/YYYY" required />
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ Personnel -->
+    <div class="card">
+      <h2><span class="badge">3</span> Personnel</h2>
+      <div class="grid-3">
+        <div class="field">
+          <label>Author</label>
+          <input type="text" name="author" placeholder="Full name" required />
+        </div>
+        <div class="field">
+          <label>Checked</label>
+          <input type="text" name="checked" placeholder="Full name" required />
+        </div>
+        <div class="field">
+          <label>Approved</label>
+          <input type="text" name="approved" placeholder="Full name" required />
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ Station Address -->
+    <div class="card">
+      <h2><span class="badge">4</span> Station Address</h2>
+      <div class="field">
+        <label>Address</label>
+        <textarea name="station_address" placeholder="Full station address…" required></textarea>
+      </div>
+    </div>
+
+    <!-- ⑤ Input P01 PPTX + GA detection -->
+    <div class="card">
+      <h2><span class="badge">5</span> Input PPTX (P01 Version)</h2>
+      <div class="field">
+        <label>P01 PPTX file</label>
+        <input type="file" name="p01_file" accept=".pptx" required id="p01-input" />
+      </div>
+
+      <div style="margin-top:1rem;">
+        <label>
+          GA Slide Count
+          <span class="hint"> — auto-detected from P01, or override manually</span>
+        </label>
+        <div class="ga-detect-row">
+          <button type="button" id="ga-detect-btn" onclick="detectGA()">
+            Auto-detect
+          </button>
+          <span id="ga-detected-badge">Detected: <strong id="ga-count-val">0</strong></span>
+          <span id="ga-detect-status"></span>
+        </div>
+        <div class="field" style="margin-top:.75rem;">
+          <label>Override count <span class="hint">(leave blank to use auto-detected)</span></label>
+          <input type="number" name="ga_count_override" id="ga-override-input"
+                 min="0" max="50" placeholder="e.g. 3" style="max-width:140px;" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑥ Images -->
+    <div class="card">
+      <h2><span class="badge">6</span> Design & Building Images</h2>
+      <div class="field">
+        <label>
+          All images
+          <span class="hint"> — select design plan images AND building images together.
+            Files containing <em>"Design plan"</em> are treated as RF Schematics;
+            all others as GA building slides.</span>
+        </label>
+        <input type="file" name="images" accept="image/*" multiple required id="images-input"
+               onchange="previewFiles(this)" />
+        <ul class="file-list" id="file-list"></ul>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="submit-wrap">
+      <div id="spinner"><div class="spinner-ring"></div> Generating…</div>
+      <button type="submit" onclick="showSpinner()">Generate PPTX ↓</button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  // Preview station code/name from 3D image filename
+  document.getElementById("image-3d-input").addEventListener("change", function () {
+    const file = this.files[0];
+    if (!file) return;
+    const stem = file.name.replace(/\.[^.]+$/, "");
+    const parts = stem.split("_");
+    const el = document.getElementById("station-preview");
+    if (parts.length >= 3 && parts[0] === "3D") {
+      el.textContent = `Station: ${parts[1]} – ${parts.slice(2).join("_")}`;
+    } else {
+      el.textContent = "⚠ Filename should be: 3D_STATIONCODE_STATIONNAME.ext";
+      el.style.color = "#e94560";
+    }
+  });
+
+  // Preview uploaded image filenames
+  function previewFiles(input) {
+    const list = document.getElementById("file-list");
+    list.innerHTML = "";
+    const files = Array.from(input.files);
+    if (!files.length) { list.style.display = "none"; return; }
+    files.forEach(f => {
+      const li = document.createElement("li");
+      const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
+      const tag = (stem.includes("design plan") || stem.includes("design_plan"))
+        ? " 📐 RF Schematics"
+        : " 🏢 GA Building";
+      li.textContent = f.name + tag;
+      list.appendChild(li);
+    });
+    list.style.display = "block";
+  }
+
+  // Auto-detect GA count via server
+  async function detectGA() {
+    const fileInput = document.getElementById("p01-input");
+    const btn = document.getElementById("ga-detect-btn");
+    const status = document.getElementById("ga-detect-status");
+    const badge = document.getElementById("ga-detected-badge");
+    const override = document.getElementById("ga-override-input");
+
+    if (!fileInput.files.length) {
+      status.textContent = "Upload a P01 PPTX file first.";
+      return;
+    }
+
+    btn.disabled = true;
+    status.textContent = "Analysing…";
+    badge.style.display = "none";
+
+    const fd = new FormData();
+    fd.append("p01_file", fileInput.files[0]);
+
+    try {
+      const resp = await fetch("/detect-ga", { method: "POST", body: fd });
+      const data = await resp.json();
+      const count = data.count || 0;
+      document.getElementById("ga-count-val").textContent = count;
+      badge.style.display = "inline-block";
+      override.placeholder = count;
+      if (count === 0) {
+        status.textContent = "None found – enter count manually below.";
+      } else {
+        status.textContent = `Detected via ${data.method === "xml" ? "text search" : "OCR"}.`;
+      }
+    } catch (e) {
+      status.textContent = "Detection failed – enter count manually.";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function showSpinner() {
+    document.getElementById("spinner").style.display = "flex";
+  }
+</script>
+</body>
+</html>

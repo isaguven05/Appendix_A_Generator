@@ -385,7 +385,7 @@ def generate_pptx(
         "<C>":              c_ini,
         "<A>":              a_ini,
         # Title slide level
-        "<<STATION>>":      station_name,
+        "<<STATION>>":      f"{code} {station_name}",
         "<<CODE>>":         code,
         "<<Author>>":       author,
         "<<Checked>>":      checked,

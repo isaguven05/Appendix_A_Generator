@@ -73,7 +73,7 @@
   <header>
     <a href="{{ url_for('home') }}" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:#6366f1;text-decoration:none;margin-bottom:.6rem;font-weight:600;opacity:.75;">← Back to Home</a>
     <h1>Appendix B – RF Predictions Generator</h1>
-    <p>Upload your RF prediction map images and generate provider PPTX files in one click.</p>
+    <p>Upload the RF Predictions report and your 3D station image to generate provider PPTX files in one click.</p>
   </header>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -141,126 +141,25 @@
       </div>
     </div>
 
-    <!-- ⑤ Filename Guide -->
+    <!-- ⑤ RF Predictions Report -->
     <div class="card">
-      <h2><span class="badge">5</span> Image Filename Guide</h2>
-
-      <p style="font-size:.9rem;color:#444;margin-bottom:1.25rem;">
-        Appendix B images must encode the <strong>provider, technology, frequency, metric and building</strong>
-        directly in the filename — exactly the format produced by the RF extraction tool.
-        The app reads this to select the right template slide and sort the output automatically.
-      </p>
-
-      <!-- Format box -->
-      <div class="guide-section-title"><span class="guide-icon">📋</span> Required filename format</div>
-      <div class="format-box">
-        <span class="pattern">PROVIDER_TECH_MHZ_METRIC_BUILDING.png</span>
-        <span class="example">
-          EE_LTE_1800_RSRP_TICKET_HALL.png<br>
-          THREE_5GNR_3500_SSRSRP_MIDWAY.png<br>
-          VMO2_GSM_1800_RXLEV_PLATFORM_1_2.png<br>
-          VODAFONE_UMTS_2100_RSCP_BASEMENT.png
-        </span>
-      </div>
-
-      <!-- Part 1: Provider -->
-      <div class="guide-section-title" style="margin-top:1.25rem;">
-        <span class="guide-icon">🏷️</span> PART 1 — Provider prefix
-      </div>
-      <p class="guide-sub">Must be the very first part of the filename, followed by an underscore:</p>
-      <div class="guide-table-wrap">
-        <table class="guide-table">
-          <thead><tr><th>Provider</th><th>Prefix</th><th>Example</th></tr></thead>
-          <tbody>
-            <tr class="row-ee">
-              <td><span class="prov-badge prov-ee">EE</span></td>
-              <td><code>EE_</code></td>
-              <td><span class="eg">EE_LTE_1800_RSRP_TICKET_HALL.png</span></td>
-            </tr>
-            <tr class="row-three">
-              <td><span class="prov-badge prov-three">THREE</span></td>
-              <td><code>THREE_</code></td>
-              <td><span class="eg">THREE_GSM_1800_SNIR_MIDWAY.png</span></td>
-            </tr>
-            <tr class="row-voda">
-              <td><span class="prov-badge prov-voda">VODAFONE</span></td>
-              <td><code>VODAFONE_</code></td>
-              <td><span class="eg">VODAFONE_LTE_2100_SNIR_PLATFORM.png</span></td>
-            </tr>
-            <tr class="row-vmo2">
-              <td><span class="prov-badge prov-vmo2">VMO2</span></td>
-              <td><code>VMO2_</code></td>
-              <td><span class="eg">VMO2_5GNR_3500_SSRSRP_TICKET_HALL.png</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Part 2: Tech/Freq/Metric -->
-      <div class="guide-section-title" style="margin-top:1.5rem;">
-        <span class="guide-icon">📡</span> PART 2 — Technology, Frequency &amp; Metric
-      </div>
-      <p class="guide-sub">Use exact values below (case-sensitive). Only these combinations are valid:</p>
-      <div class="guide-table-wrap">
-        <table class="guide-table">
-          <thead><tr><th>Tech</th><th>Freq (MHz)</th><th>Metric</th><th>Full example</th></tr></thead>
-          <tbody>
-            <tr><td><code>GSM</code></td><td><code>1800</code></td><td><code>RXLEV</code> or <code>SNIR</code></td><td><span class="eg">EE_GSM_1800_RXLEV_MIDWAY.png</span></td></tr>
-            <tr><td><code>UMTS</code></td><td><code>2100</code></td><td><code>RSCP</code> or <code>ECIO</code></td><td><span class="eg">EE_UMTS_2100_RSCP_TICKET_HALL.png</span></td></tr>
-            <tr><td><code>LTE</code></td><td><code>1800</code></td><td><code>RSRP</code> or <code>SNIR</code></td><td><span class="eg">EE_LTE_1800_RSRP_BASEMENT.png</span></td></tr>
-            <tr><td><code>LTE</code></td><td><code>2100</code></td><td><code>RSRP</code> or <code>SNIR</code></td><td><span class="eg">EE_LTE_2100_SNIR_CONCOURSE.png</span></td></tr>
-            <tr><td><code>LTE</code></td><td><code>2300</code></td><td><code>RSRP</code> or <code>SNIR</code></td><td><span class="eg">EE_LTE_2300_RSRP_STAIRS.png</span></td></tr>
-            <tr><td><code>LTE</code></td><td><code>2600</code></td><td><code>RSRP</code> or <code>SNIR</code></td><td><span class="eg">EE_LTE_2600_SNIR_PLATFORM.png</span></td></tr>
-            <tr><td><code>5GNR</code></td><td><code>3500</code></td><td><code>SSRSRP</code> or <code>SNIR</code></td><td><span class="eg">EE_5GNR_3500_SSRSRP_MIDWAY.png</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Part 3: Building -->
-      <div class="guide-section-title" style="margin-top:1.5rem;">
-        <span class="guide-icon">🏢</span> PART 3 — Building name
-      </div>
-      <p class="guide-sub">
-        Everything after the metric, with spaces replaced by underscores.
-        Slides are sorted in this default order:
-      </p>
-      <p style="font-family:monospace;font-size:.85rem;color:#4f46e5;background:#f0effe;padding:.5rem .75rem;border-radius:6px;margin-bottom:.75rem;">
-        TICKET_HALL → MIDWAY → BASEMENT → STAIRS → CONCOURSE → PLATFORM
-      </p>
-      <p style="font-size:.82rem;color:#555;">
-        Any other building name is placed at the end alphabetically.
-        Multi-word names: <code>PLATFORM_1_2</code>, <code>LIFT_MOTOR_ROOM</code>, <code>LOWER_CONCOURSE</code>
-      </p>
-
-      <!-- Warning -->
-      <div class="warn-section">
-        <div class="guide-section-title" style="color:#92400e;">
-          <span class="guide-icon">⚠️</span> Files that WILL be skipped
-        </div>
-        <ul class="warn-list">
-          <li>No recognised provider prefix — e.g. <code>LTE_1800_RSRP_TICKET_HALL.png</code></li>
-          <li>Unrecognised tech/freq/metric combo — e.g. <code>EE_LTE_900_RSRP_MIDWAY.png</code> (900 MHz not in template)</li>
-          <li>Fewer than 5 parts when split on underscores</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- ⑥ Upload Images -->
-    <div class="card">
-      <h2><span class="badge">6</span> Upload RF Map Images (All Providers)</h2>
+      <h2><span class="badge">5</span> RF Predictions Report</h2>
       <div class="field">
-        <label>All RF prediction images <span class="hint">— select every image across all providers at once.</span></label>
-        <input type="file" name="images" accept="image/*" multiple required id="images-input"
-               onchange="previewFiles(this)" />
-        <ul class="file-list" id="file-list"></ul>
+        <label>Upload the Output Maps Report <span class="hint">— the PPTX generated by the RF prediction tool</span></label>
+        <input type="file" name="input_pptx" accept=".pptx" required id="pptx-input" />
+        <small id="pptx-preview" style="color:#6366f1;font-weight:600;margin-top:.25rem;"></small>
       </div>
-      <p style="font-size:.8rem;color:#888;margin-top:.5rem;">
-        One PPTX per provider. All four providers → <strong>.zip</strong> file.
-        Slides are sorted automatically by technology order then building order.
+      <p style="font-size:.82rem;color:#888;margin-top:.75rem;">
+        The app reads every slide automatically — extracting the provider, technology, frequency,
+        metric and building from the slide text — then builds one output PPTX per provider.
+        Slides are sorted by technology order then building order.
+        <br><br>
+        <strong>Recognised providers:</strong> EE &nbsp;·&nbsp; Three &nbsp;·&nbsp; Vodafone &nbsp;·&nbsp; VMO2<br>
+        <strong>Output:</strong> one PPTX per provider found &nbsp;|&nbsp; multiple providers → <strong>.zip</strong>
       </p>
     </div>
 
-    <!-- ⑦ Submit -->
+    <!-- ⑥ Submit -->
     <div class="submit-wrap">
       <div id="spinner"><div class="spinner-ring"></div> Generating…</div>
       <button type="submit" onclick="showSpinner()">Generate PPTX(s) ↓</button>
@@ -278,7 +177,7 @@
     const parts = stem.split("_");
     const el    = document.getElementById("station-preview");
     if (parts.length >= 3 && parts[0] === "3D") {
-      el.textContent = "Station: " + parts[1] + " – " + parts.slice(2).join("_");
+      el.textContent = "Station: " + parts[1] + " – " + parts.slice(2).join(" ");
       el.style.color = "#6366f1";
     } else {
       el.textContent = "⚠ Filename should be: 3D_STATIONCODE_STATIONNAME.ext";
@@ -286,63 +185,14 @@
     }
   });
 
-  // Valid tech/freq/metric combos — mirrors TEMPLATE_MAP in engine_b.py
-  const VALID_COMBOS = new Set([
-    "GSM_1800_RXLEV","GSM_1800_SNIR",
-    "UMTS_2100_RSCP","UMTS_2100_ECIO",
-    "LTE_1800_RSRP","LTE_1800_SNIR",
-    "LTE_2100_RSRP","LTE_2100_SNIR",
-    "LTE_2300_RSRP","LTE_2300_SNIR",
-    "LTE_2600_RSRP","LTE_2600_SNIR",
-    "5GNR_3500_SSRSRP","5GNR_3500_SNIR",
-  ]);
-
-  function getProvider(name) {
-    const u = name.toUpperCase();
-    for (const [pfx,key] of [["EE_","EE"],["THREE_","THREE"],["VODAFONE_","VODAFONE"],["VMO2_","VMO2"]]) {
-      if (u.startsWith(pfx)) return key;
-    }
-    return null;
-  }
-
-  const COLOURS = { EE:"#e94560", THREE:"#f59e0b", VODAFONE:"#e50000", VMO2:"#6366f1" };
-
-  function previewFiles(input) {
-    const list = document.getElementById("file-list");
-    list.innerHTML = "";
-    if (!input.files.length) { list.style.display = "none"; return; }
-
-    Array.from(input.files).forEach(f => {
-      const li   = document.createElement("li");
-      const stem = f.name.replace(/\.[^.]+$/, "");
-      const pts  = stem.split("_");
-      const prov = getProvider(f.name);
-
-      if (!prov || pts.length < 5) {
-        li.className   = "unrecognised";
-        li.textContent = f.name + "  \u26A0 unrecognised — check prefix and format";
-      } else {
-        const tech   = pts[1].toUpperCase();
-        const mhz    = pts[2];
-        const metric = pts[3].toUpperCase();
-        const combo  = tech + "_" + mhz + "_" + metric;
-        const bld    = pts.slice(4).join("_").replace(/_/g," ");
-
-        if (!VALID_COMBOS.has(combo)) {
-          li.className = "bad-format";
-          li.innerHTML = f.name
-            + ' <span style="background:' + COLOURS[prov] + ';color:#fff;padding:.1rem .4rem;border-radius:3px;font-size:.75rem;font-weight:700;">' + prov + '</span>'
-            + ' \u26A0 unrecognised combo: ' + tech + '/' + mhz + '/' + metric;
-        } else {
-          li.innerHTML = f.name
-            + ' <span style="background:' + COLOURS[prov] + ';color:#fff;padding:.1rem .4rem;border-radius:3px;font-size:.75rem;font-weight:700;">' + prov + '</span>'
-            + ' \uD83D\uDCE1 ' + tech + ' ' + mhz + 'MHz ' + metric + ' \u2014 \uD83C\uDFE2 ' + bld;
-        }
-      }
-      list.appendChild(li);
-    });
-    list.style.display = list.children.length ? "block" : "none";
-  }
+  // PPTX file preview
+  document.getElementById("pptx-input").addEventListener("change", function () {
+    const file = this.files[0];
+    const el   = document.getElementById("pptx-preview");
+    if (!file) { el.textContent = ""; return; }
+    el.textContent = "✓ " + file.name + "  (" + (file.size / 1024 / 1024).toFixed(1) + " MB)";
+    el.style.color = "#6366f1";
+  });
 
   function showSpinner() {
     document.getElementById("spinner").style.display = "flex";

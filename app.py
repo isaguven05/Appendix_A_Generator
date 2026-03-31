@@ -20,6 +20,7 @@ from generator import (
     sort_design_plans,
 )
 from generator_b import generate_pptx_b, PROVIDER_CODES as PROVIDER_CODES_B
+from engine_b import process_pptx as extract_pptx_images
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -142,20 +143,6 @@ def split_images_by_provider(img_entries: list) -> dict:
 
     return buckets
 
-
-def split_rf_images_by_provider(img_entries: list) -> dict:
-    """
-    Appendix B version: groups images by provider only (no design_plan/building split).
-    img_entries: list of (saved_path, original_filename)
-    Returns: {provider_key: [(saved_path, original_filename), ...]}
-    """
-    buckets = {key: [] for key in PROVIDERS}
-    for saved_path, orig_name in img_entries:
-        prov = provider_for(orig_name)
-        if prov is None:
-            continue
-        buckets[prov].append((saved_path, orig_name))
-    return buckets
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -333,17 +320,19 @@ def generate_b():
     approved        = require_field("approved",        "Approved")
     station_address = require_field("station_address", "Station address")
 
-    # ── 3D image ──────────────────────────────────────────────────────────────
+    # ── 3D station image ──────────────────────────────────────────────────────
     image_3d_file = request.files.get("image_3d")
     if not image_3d_file or not image_3d_file.filename:
-        errors.append("3D image is required.")
+        errors.append("3D station image is required.")
     elif Path(image_3d_file.filename).suffix.lower() not in ALLOWED_IMAGE_EXT:
         errors.append("3D image must be an image file (PNG, JPG, etc.).")
 
-    # ── RF map images ─────────────────────────────────────────────────────────
-    image_files = request.files.getlist("images")
-    if not image_files or all(not f.filename for f in image_files):
-        errors.append("At least one RF map image is required.")
+    # ── Input RF Predictions PPTX ─────────────────────────────────────────────
+    input_pptx_file = request.files.get("input_pptx")
+    if not input_pptx_file or not input_pptx_file.filename:
+        errors.append("RF Predictions report (.pptx) is required.")
+    elif Path(input_pptx_file.filename).suffix.lower() != ".pptx":
+        errors.append("RF Predictions report must be a .pptx file.")
 
     if errors:
         for e in errors:
@@ -359,33 +348,53 @@ def generate_b():
         secure_filename(image_3d_file.filename),
     )
 
-    img_entries = []
-    for f in image_files:
-        if f.filename and Path(f.filename).suffix.lower() in ALLOWED_IMAGE_EXT:
-            saved = save_upload(f, subdir, secure_filename(f.filename))
-            img_entries.append((saved, f.filename))
-
-    if not img_entries:
-        flash("No valid image files were uploaded.", "error")
-        return redirect(url_for("appendix_b_page"))
-
-    # ── Split images by provider (no design_plan/GA distinction for B) ────────
-    buckets = split_rf_images_by_provider(img_entries)
-
-    active_providers = [k for k, v in buckets.items() if v]
-    if not active_providers:
-        flash(
-            "No images matched a provider prefix (EE_, THREE_, VODAFONE_, VMO2_). "
-            "Please rename your images and try again.",
-            "error",
-        )
-        return redirect(url_for("appendix_b_page"))
+    input_pptx_path = save_upload(
+        input_pptx_file,
+        subdir,
+        secure_filename(input_pptx_file.filename),
+    )
 
     # ── Check shared template exists ──────────────────────────────────────────
     if not TEMPLATE_B.exists():
         flash(
             "Missing Appendix B template: templateB.pptx. "
             "Please place it in the server app folder.",
+            "error",
+        )
+        return redirect(url_for("appendix_b_page"))
+
+    # ── Extract RF map images from the input PPTX ─────────────────────────────
+    # Pass THREE before EE to avoid "EE" being found inside the word "THREE"
+    b_providers  = ["THREE", "VODAFONE", "VMO2", "EE"]
+    extract_dir  = UPLOAD_DIR / subdir / "extracted"
+    try:
+        extract_pptx_images(
+            str(input_pptx_path),
+            str(extract_dir),
+            providers=b_providers,
+        )
+    except Exception as exc:
+        flash(f"Failed to read RF Predictions PPTX: {exc}", "error")
+        return redirect(url_for("appendix_b_page"))
+
+    # ── Build image_entries per provider from extracted files ─────────────────
+    buckets = {}
+    for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
+        prov_dir = extract_dir / prov
+        if prov_dir.exists():
+            entries = [
+                (prov_dir / fname, fname)
+                for fname in sorted(os.listdir(str(prov_dir)))
+                if fname.lower().endswith(".png")
+            ]
+            if entries:
+                buckets[prov] = entries
+
+    active_providers = [p for p in ["EE", "THREE", "VODAFONE", "VMO2"] if p in buckets]
+    if not active_providers:
+        flash(
+            "No RF map slides were recognised in the uploaded PPTX. "
+            "Make sure the report contains slides for EE, Three, Vodafone or VMO2.",
             "error",
         )
         return redirect(url_for("appendix_b_page"))

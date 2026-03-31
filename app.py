@@ -40,13 +40,8 @@ PROVIDERS = {
     "VMO2":     {"template": BASE_DIR / "Template_A_VMO2.pptx",     "label": "VMO2"},
 }
 
-# Provider → template file + display name  (Appendix B)
-PROVIDERS_B = {
-    "EE":       {"template": BASE_DIR / "template_B_EE.pptx",       "label": "EE"},
-    "THREE":    {"template": BASE_DIR / "template_B_THREE.pptx",     "label": "THREE"},
-    "VODAFONE": {"template": BASE_DIR / "template_B_VODAFONE.pptx",  "label": "VODAFONE"},
-    "VMO2":     {"template": BASE_DIR / "template_B_VMO2.pptx",      "label": "VMO2"},
-}
+# Appendix B uses ONE shared template for all providers
+TEMPLATE_B = BASE_DIR / "templateB.pptx"
 
 # Image filename prefix → provider key
 PREFIX_MAP = {
@@ -357,16 +352,11 @@ def generate_b():
         )
         return redirect(url_for("appendix_b_page"))
 
-    # ── Check templates exist ─────────────────────────────────────────────────
-    missing_templates = [
-        prov for prov in active_providers
-        if not PROVIDERS_B[prov]["template"].exists()
-    ]
-    if missing_templates:
+    # ── Check shared template exists ──────────────────────────────────────────
+    if not TEMPLATE_B.exists():
         flash(
-            f"Missing Appendix B template(s) for: {', '.join(missing_templates)}. "
-            f"Please add template_B_EE.pptx / template_B_THREE.pptx / "
-            f"template_B_VODAFONE.pptx / template_B_VMO2.pptx to the server.",
+            "Missing Appendix B template: templateB.pptx. "
+            "Please upload it to the server.",
             "error",
         )
         return redirect(url_for("appendix_b_page"))
@@ -379,11 +369,10 @@ def generate_b():
         for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
             if prov not in active_providers:
                 continue
-            info = PROVIDERS_B[prov]
             bkt  = buckets[prov]
             try:
                 pptx_bytes = generate_pptx_b(
-                    template_path      = str(info["template"]),
+                    template_path      = str(TEMPLATE_B),
                     date               = date,
                     author             = author,
                     checked            = checked,

@@ -145,6 +145,79 @@
       border-radius: 6px; padding: .75rem 1rem;
       font-size: .85rem; color: #1a1a2e; margin-bottom: 1rem;
     }
+
+    /* ── Filename guide ── */
+    .guide-section { }
+
+    .guide-section-title {
+      font-size: .95rem; font-weight: 700; color: #0f3460;
+      margin-bottom: .6rem; display: flex; align-items: center; gap: .4rem;
+    }
+
+    .guide-icon { font-size: 1.1rem; }
+    .guide-sub  { font-size: .85rem; color: #555; margin-bottom: .75rem; }
+
+    .guide-table-wrap { overflow-x: auto; }
+
+    .guide-table {
+      width: 100%; border-collapse: collapse; font-size: .83rem;
+    }
+
+    .guide-table th {
+      background: #f0f2f5; text-align: left; padding: .5rem .75rem;
+      font-size: .78rem; text-transform: uppercase; letter-spacing: .04em;
+      color: #555; border-bottom: 2px solid #dde;
+    }
+
+    .guide-table td {
+      padding: .55rem .75rem; border-bottom: 1px solid #eee;
+      vertical-align: top; line-height: 1.6;
+    }
+
+    .guide-table tr:last-child td { border-bottom: none; }
+
+    .row-ee   td:first-child { border-left: 4px solid #e94560; }
+    .row-three td:first-child { border-left: 4px solid #f59e0b; }
+    .row-voda  td:first-child { border-left: 4px solid #e50000; }
+    .row-vmo2  td:first-child { border-left: 4px solid #6366f1; }
+
+    .prov-badge {
+      display: inline-block; padding: .2rem .6rem; border-radius: 4px;
+      font-weight: 700; font-size: .82rem; color: #fff;
+    }
+    .prov-ee    { background: #e94560; }
+    .prov-three { background: #f59e0b; }
+    .prov-voda  { background: #e50000; }
+    .prov-vmo2  { background: #6366f1; }
+
+    .type-badge {
+      display: inline-block; padding: .2rem .55rem; border-radius: 4px;
+      font-size: .8rem; font-weight: 600; white-space: nowrap;
+    }
+    .type-rf { background: #e8f4fd; color: #0f3460; }
+    .type-ga { background: #e8f8e8; color: #1a7a3a; }
+
+    .guide-table code {
+      background: #f4f6fb; padding: .1rem .35rem; border-radius: 3px;
+      font-size: .82rem; color: #0f3460;
+    }
+
+    .eg { color: #555; font-size: .8rem; }
+
+    .warn-section {
+      background: #fff8ed; border-left: 4px solid #f59e0b;
+      border-radius: 6px; padding: .9rem 1rem;
+    }
+
+    .warn-list {
+      margin: .4rem 0 0 1rem; font-size: .85rem; color: #7a3a00;
+      line-height: 1.8;
+    }
+
+    .warn-list code {
+      background: #fdecc8; padding: .1rem .35rem; border-radius: 3px;
+      font-size: .8rem;
+    }
   </style>
 </head>
 <body>
@@ -223,38 +296,153 @@
       </div>
     </div>
 
-    <!-- ⑤ Images -->
+    <!-- ⑤ Filename Guide -->
     <div class="card">
-      <h2><span class="badge">5</span> Design &amp; Building Images (All Providers)</h2>
+      <h2><span class="badge">5</span> Image Filename Guide</h2>
 
-      <div class="info-box">
-        Images are automatically routed to the correct provider by their filename prefix.
-        Each provider will always receive exactly <strong>2 × 2_GA slides</strong>.
-        A separate PPTX is generated per provider; if you upload images for all four you'll
-        receive a <strong>.zip</strong> file.
+      <p style="font-size:.9rem;color:#444;margin-bottom:1.2rem;">
+        The app reads the <strong>filename</strong> of each image to decide which provider it belongs to
+        and whether it is an <em>RF Schematics</em> slide or a <em>GA Building</em> slide.
+        Follow the rules below — any file that cannot be matched will be flagged in red and skipped.
+      </p>
+
+      <!-- Provider detection -->
+      <div class="guide-section">
+        <div class="guide-section-title">
+          <span class="guide-icon">🏷️</span> STEP 1 — Provider must appear somewhere in the filename
+        </div>
+        <p class="guide-sub">The app accepts any of these formats (case-insensitive):</p>
+
+        <div class="guide-table-wrap">
+          <table class="guide-table">
+            <thead>
+              <tr><th>Provider</th><th>Accepted filename patterns</th><th>Examples</th></tr>
+            </thead>
+            <tbody>
+              <tr class="row-ee">
+                <td><span class="prov-badge prov-ee">EE</span></td>
+                <td>
+                  <code>EE_Station - ...</code><br>
+                  <code>EE - Station - ...</code>
+                </td>
+                <td>
+                  <span class="eg">EE_Temple - Design plan1.jpeg</span><br>
+                  <span class="eg">EE - Lambeth North - Design plan1.jpeg</span>
+                </td>
+              </tr>
+              <tr class="row-three">
+                <td><span class="prov-badge prov-three">THREE</span></td>
+                <td>
+                  <code>THREE_Station - ...</code><br>
+                  <code>Three - Station - ...</code><br>
+                  <code>THREE - Station - ...</code>
+                </td>
+                <td>
+                  <span class="eg">THREE_Temple - Building 1 - Midway.jpeg</span><br>
+                  <span class="eg">Three - Lambeth North - Design plan2.jpeg</span>
+                </td>
+              </tr>
+              <tr class="row-voda">
+                <td><span class="prov-badge prov-voda">VODAFONE</span></td>
+                <td>
+                  <code>VODA_Station - ...</code><br>
+                  <code>VODAFONE_Station - ...</code><br>
+                  <code>Vodafone - Station - ...</code><br>
+                  <code>Station_voda1 - ...</code>
+                </td>
+                <td>
+                  <span class="eg">VODA_Temple - Design plan3.jpeg</span><br>
+                  <span class="eg">Vodafone - Lambeth North - Building 1 - Platforms.jpeg</span><br>
+                  <span class="eg">Lambeth North_voda1 - Design plan5.jpeg</span>
+                </td>
+              </tr>
+              <tr class="row-vmo2">
+                <td><span class="prov-badge prov-vmo2">VMO2</span></td>
+                <td>
+                  <code>VMO2_Station - ...</code><br>
+                  <code>VMO2 - Station - ...</code><br>
+                  <code>Station_VMO2NEW - ...</code>
+                </td>
+                <td>
+                  <span class="eg">VMO2_Temple - Design plan4.jpeg</span><br>
+                  <span class="eg">Lambeth North_VMO2NEW - Design plan6.jpeg</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="provider-grid">
-        <div class="provider-pill"><span class="dot dot-ee"></span><strong>EE_</strong>&nbsp;→ EE template</div>
-        <div class="provider-pill"><span class="dot dot-three"></span><strong>THREE_</strong>&nbsp;→ THREE template</div>
-        <div class="provider-pill"><span class="dot dot-vodafone"></span><strong>VODA_</strong>&nbsp;→ VODAFONE template</div>
-        <div class="provider-pill"><span class="dot dot-vmo2"></span><strong>VMO2_</strong>&nbsp;→ VMO2 template</div>
+      <!-- Slide type detection -->
+      <div class="guide-section" style="margin-top:1.5rem;">
+        <div class="guide-section-title">
+          <span class="guide-icon">📄</span> STEP 2 — Slide type is detected from the filename
+        </div>
+        <p class="guide-sub">After the provider is identified, the app checks the filename for these keywords:</p>
+
+        <div class="guide-table-wrap">
+          <table class="guide-table">
+            <thead>
+              <tr><th>Slide type</th><th>Rule</th><th>Examples</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="type-badge type-rf">📐 RF Schematics</span></td>
+                <td>Filename contains <code>Design plan</code> or <code>Design_plan</code></td>
+                <td>
+                  <span class="eg">EE - Lambeth North - Design plan1.jpeg</span><br>
+                  <span class="eg">THREE_Temple - Design plan2.jpeg</span>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="type-badge type-ga">🏢 GA Building</span></td>
+                <td>Everything else — the last part of the name becomes the slide title</td>
+                <td>
+                  <span class="eg">EE_Temple - Building 1 - <strong>Midway</strong>.jpeg → title: "Midway"</span><br>
+                  <span class="eg">THREE_Temple - Building 1 - <strong>Platform 1&amp;2</strong>.jpeg → title: "Platform 1&amp;2"</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="field" style="margin-top:1rem;">
+      <!-- What doesn't work -->
+      <div class="guide-section warn-section" style="margin-top:1.5rem;">
+        <div class="guide-section-title">
+          <span class="guide-icon">⚠️</span> Files that WILL be skipped (shown in red below)
+        </div>
+        <ul class="warn-list">
+          <li>Files with <strong>no provider keyword</strong> anywhere in the name — e.g. <code>Lambeth North - Building 1 - Basement.jpeg</code></li>
+          <li>Files tagged only with <strong>_DONE</strong>, <strong>_NEW</strong>, <strong>_FINAL</strong> etc. with no EE / THREE / VODA / VMO2 in the name</li>
+        </ul>
+        <p style="margin-top:.6rem;font-size:.83rem;color:#7a3a00;">
+          👉 Simply add the provider name anywhere in the filename to fix this —
+          e.g. rename to <code>EE - Lambeth North - Building 1 - Basement.jpeg</code>
+        </p>
+      </div>
+    </div>
+
+    <!-- ⑥ Images -->
+    <div class="card">
+      <h2><span class="badge">6</span> Upload Images (All Providers)</h2>
+
+      <div class="field">
         <label>
           All images
-          <span class="hint"> — select every design plan and building image across all providers.
-            Files containing <em>"Design plan"</em> → RF Schematics slides;
-            all others → GA building slides.</span>
+          <span class="hint"> — select every design plan and building image across all providers at once.</span>
         </label>
         <input type="file" name="images" accept="image/*" multiple required id="images-input"
                onchange="previewFiles(this)" />
         <ul class="file-list" id="file-list"></ul>
       </div>
+      <p style="font-size:.8rem;color:#888;margin-top:.5rem;">
+        Each provider generates its own PPTX. If images for all four providers are uploaded you will receive a <strong>.zip</strong> file.
+        Each provider always gets exactly <strong>2 × 2_GA slides</strong>.
+      </p>
     </div>
 
-    <!-- Submit -->
+    <!-- ⑦ Submit -->
     <div class="submit-wrap">
       <div id="spinner"><div class="spinner-ring"></div> Generating…</div>
       <button type="submit" onclick="showSpinner()">Generate PPTX(s) ↓</button>

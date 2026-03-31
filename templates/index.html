@@ -264,8 +264,6 @@
 </div>
 
 <script>
-  const PREFIXES = ["EE_", "THREE_", "VODA_", "VMO2_"];
-
   document.getElementById("image-3d-input").addEventListener("change", function () {
     const file = this.files[0];
     if (!file) return;
@@ -281,11 +279,54 @@
     }
   });
 
+  /**
+   * Mirrors the Python provider_for() logic exactly.
+   * Pattern 1: PROVIDER_ prefix  (EE_, THREE_, VODA_, VODAFONE_, VMO2_)
+   * Pattern 2: PROVIDER - prefix (EE - , Three - , Vodafone - , Voda - , THREE - , VMO2 - )
+   * Pattern 3: keyword anywhere  (VMO2, VODAFONE, VODA, THREE inside any part of the name)
+   */
   function getProviderTag(name) {
-    const upper = name.toUpperCase();
-    for (const p of PREFIXES) {
-      if (upper.startsWith(p.toUpperCase())) return p.replace("_", "");
+    const stem  = name.replace(/\.[^.]+$/, "");   // strip extension
+    const upper = stem.toUpperCase();
+
+    // Pattern 1 – underscore prefix
+    const underscorePrefixes = [
+      ["EE_",       "EE"],
+      ["THREE_",    "THREE"],
+      ["VMO2_",     "VMO2"],
+      ["VODAFONE_", "VODAFONE"],
+      ["VODA_",     "VODAFONE"],
+    ];
+    for (const [pfx, key] of underscorePrefixes) {
+      if (upper.startsWith(pfx)) return key;
     }
+
+    // Pattern 2 – "PROVIDER - " space-dash-space prefix
+    const spaceDashPrefixes = [
+      ["EE - ",       "EE"],
+      ["THREE - ",    "THREE"],
+      ["VMO2 - ",     "VMO2"],
+      ["VODAFONE - ", "VODAFONE"],
+      ["VODA - ",     "VODAFONE"],
+    ];
+    for (const [pfx, key] of spaceDashPrefixes) {
+      if (upper.startsWith(pfx.toUpperCase())) return key;
+    }
+
+    // Pattern 3 – keyword anywhere (longer/more-specific first)
+    const keywords = [
+      ["VODAFONE", "VODAFONE"],
+      ["VMO2",     "VMO2"],
+      ["THREE",    "THREE"],
+      ["VODA",     "VODAFONE"],
+    ];
+    for (const [kw, key] of keywords) {
+      if (upper.includes(kw)) return key;
+    }
+
+    // EE last — only match as standalone word to avoid false positives
+    if (/(?:^|[\s\-_])EE(?:[\s\-_]|$)/.test(upper)) return "EE";
+
     return null;
   }
 

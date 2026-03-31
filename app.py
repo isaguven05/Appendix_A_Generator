@@ -4,6 +4,7 @@ Flask web app for Appendix A PPTX automation – multi-provider edition.
 
 import io
 import os
+import re
 import uuid
 import zipfile as zipfile_mod
 from pathlib import Path
@@ -101,6 +102,11 @@ def provider_for(original_name: str):
     for keyword, key in keyword_map:
         if keyword in stem:
             return key
+
+    # EE is last — it's only 2 chars so check it carefully:
+    # must appear as a standalone word (start of stem, or after space/dash/underscore)
+    if re.search(r"(^|[\s\-_])EE([\s\-_]|$)", stem):
+        return "EE"
 
     return None
 

@@ -42,7 +42,8 @@ PROVIDERS = {
 PREFIX_MAP = {
     "EE_":       "EE",
     "THREE_":    "THREE",
-    "VODA_":     "VODAFONE",
+    "VODAFONE_": "VODAFONE",   # matches VODAFONE_ / vodafone_ / Vodafone_ etc.
+    "VODA_":     "VODAFONE",   # matches VODA_ / voda_ / Voda_ etc.
     "VMO2_":     "VMO2",
 }
 

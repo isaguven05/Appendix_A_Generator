@@ -19,6 +19,7 @@ from generator import (
     generate_pptx,
     sort_design_plans,
 )
+from generator_b import generate_pptx_b
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -31,12 +32,20 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif"}
 
-# Provider → template file + display name
+# Provider → template file + display name  (Appendix A)
 PROVIDERS = {
     "EE":       {"template": BASE_DIR / "template_A_EE.pptx",      "label": "EE"},
     "THREE":    {"template": BASE_DIR / "Template_A_THREE.pptx",    "label": "THREE"},
     "VODAFONE": {"template": BASE_DIR / "Template_A_VODA.pptx",     "label": "VODAFONE"},
     "VMO2":     {"template": BASE_DIR / "Template_A_VMO2.pptx",     "label": "VMO2"},
+}
+
+# Provider → template file + display name  (Appendix B)
+PROVIDERS_B = {
+    "EE":       {"template": BASE_DIR / "template_B_EE.pptx",       "label": "EE"},
+    "THREE":    {"template": BASE_DIR / "template_B_THREE.pptx",     "label": "THREE"},
+    "VODAFONE": {"template": BASE_DIR / "template_B_VODAFONE.pptx",  "label": "VODAFONE"},
+    "VMO2":     {"template": BASE_DIR / "template_B_VMO2.pptx",      "label": "VMO2"},
 }
 
 # Image filename prefix → provider key
@@ -142,11 +151,23 @@ def split_images_by_provider(img_entries: list) -> dict:
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route("/", methods=["GET"])
+def home():
+    return render_template("home.html")
+
+
+@app.route("/appendix-a", methods=["GET"])
+def appendix_a_page():
+    return render_template("appendix_a.html")
+
+
+# Legacy redirect so any bookmarks to "/" still work
+@app.route("/index", methods=["GET"])
 def index():
-    return render_template("index.html")
+    return redirect(url_for("appendix_a_page"))
 
 
-@app.route("/generate", methods=["POST"])
+@app.route("/appendix-a/generate", methods=["POST"])
+@app.route("/generate", methods=["POST"])   # ← keep old URL working
 def generate():
     session_id = uuid.uuid4().hex
     errors = []
@@ -179,7 +200,7 @@ def generate():
     if errors:
         for e in errors:
             flash(e, "error")
-        return redirect(url_for("index"))
+        return redirect(url_for("appendix_a_page"))
 
     # ── Save uploads ──────────────────────────────────────────────────────────
     subdir = session_id
@@ -199,7 +220,7 @@ def generate():
 
     if not img_entries:
         flash("No valid image files were uploaded.", "error")
-        return redirect(url_for("index"))
+        return redirect(url_for("appendix_a_page"))
 
     buckets = split_images_by_provider(img_entries)
 
@@ -212,14 +233,14 @@ def generate():
             "Please rename your images and try again.",
             "error",
         )
-        return redirect(url_for("index"))
+        return redirect(url_for("appendix_a_page"))
 
     # ── Generate one PPTX per active provider, zip them ──────────────────────
     try:
         _, _, combined = extract_station_info(str(image_3d_path))
     except Exception as exc:
         flash(f"Could not parse station from 3D image filename: {exc}", "error")
-        return redirect(url_for("index"))
+        return redirect(url_for("appendix_a_page"))
 
     zip_buf = io.BytesIO()
     generated = []
@@ -251,7 +272,7 @@ def generate():
                 flash(f"{prov} generation failed: {exc}", "error")
 
     if not generated:
-        return redirect(url_for("index"))
+        return redirect(url_for("appendix_a_page"))
 
     zip_buf.seek(0)
 
@@ -273,6 +294,134 @@ def generate():
         zip_buf,
         as_attachment=True,
         download_name=zip_name,
+        mimetype="application/zip",
+    )
+
+
+# ─── Appendix B routes ────────────────────────────────────────────────────────
+
+@app.route("/appendix-b", methods=["GET"])
+def appendix_b_page():
+    return render_template("appendix_b.html")
+
+
+@app.route("/appendix-b/generate", methods=["POST"])
+def generate_b():
+    session_id = uuid.uuid4().hex
+    errors = []
+
+    def require_field(name, label):
+        val = request.form.get(name, "").strip()
+        if not val:
+            errors.append(f"{label} is required.")
+        return val
+
+    date            = require_field("date",            "Date")
+    p01_date        = require_field("p01_date",        "P01 date")
+    author          = require_field("author",          "Author")
+    checked         = require_field("checked",         "Checked")
+    approved        = require_field("approved",        "Approved")
+    station_address = require_field("station_address", "Station address")
+
+    # ── Images ────────────────────────────────────────────────────────────────
+    image_files = request.files.getlist("images")
+    if not image_files or all(not f.filename for f in image_files):
+        errors.append("At least one image is required.")
+
+    if errors:
+        for e in errors:
+            flash(e, "error")
+        return redirect(url_for("appendix_b_page"))
+
+    # ── Save uploads ──────────────────────────────────────────────────────────
+    subdir = session_id
+    img_entries = []
+    for f in image_files:
+        if f.filename and Path(f.filename).suffix.lower() in ALLOWED_IMAGE_EXT:
+            saved = save_upload(f, subdir, secure_filename(f.filename))
+            img_entries.append((saved, f.filename))
+
+    if not img_entries:
+        flash("No valid image files were uploaded.", "error")
+        return redirect(url_for("appendix_b_page"))
+
+    buckets = split_images_by_provider(img_entries)
+
+    active_providers = [k for k, v in buckets.items()
+                        if v["design_plans"] or v["building_imgs"]]
+    if not active_providers:
+        flash(
+            "No images matched a provider prefix (EE_, THREE_, VODA_, VMO2_). "
+            "Please rename your images and try again.",
+            "error",
+        )
+        return redirect(url_for("appendix_b_page"))
+
+    # ── Check templates exist ─────────────────────────────────────────────────
+    missing_templates = [
+        prov for prov in active_providers
+        if not PROVIDERS_B[prov]["template"].exists()
+    ]
+    if missing_templates:
+        flash(
+            f"Missing Appendix B template(s) for: {', '.join(missing_templates)}. "
+            f"Please add template_B_EE.pptx / template_B_THREE.pptx / "
+            f"template_B_VODAFONE.pptx / template_B_VMO2.pptx to the server.",
+            "error",
+        )
+        return redirect(url_for("appendix_b_page"))
+
+    # ── Generate one PPTX per active provider ────────────────────────────────
+    zip_buf = io.BytesIO()
+    generated = []
+
+    with zipfile_mod.ZipFile(zip_buf, "w", zipfile_mod.ZIP_DEFLATED) as zf:
+        for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
+            if prov not in active_providers:
+                continue
+            info = PROVIDERS_B[prov]
+            bkt  = buckets[prov]
+            try:
+                pptx_bytes = generate_pptx_b(
+                    template_path      = str(info["template"]),
+                    date               = date,
+                    author             = author,
+                    checked            = checked,
+                    approved           = approved,
+                    address            = station_address,
+                    p01_date           = p01_date,
+                    design_plan_images = bkt["design_plans"],
+                    building_images    = bkt["building_imgs"],
+                    building_titles    = bkt["building_titles"],
+                    provider           = prov,
+                )
+                fname = f"B – RF Predictions - {prov}.pptx"
+                zf.writestr(fname, pptx_bytes)
+                generated.append(prov)
+            except Exception as exc:
+                flash(f"{prov} generation failed: {exc}", "error")
+
+    if not generated:
+        return redirect(url_for("appendix_b_page"))
+
+    zip_buf.seek(0)
+
+    if len(generated) == 1:
+        prov  = generated[0]
+        fname = f"B – RF Predictions - {prov}.pptx"
+        with zipfile_mod.ZipFile(io.BytesIO(zip_buf.getvalue())) as zf:
+            pptx_bytes = zf.read(fname)
+        return send_file(
+            io.BytesIO(pptx_bytes),
+            as_attachment=True,
+            download_name=fname,
+            mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+
+    return send_file(
+        zip_buf,
+        as_attachment=True,
+        download_name="Appendix_B.zip",
         mimetype="application/zip",
     )
 

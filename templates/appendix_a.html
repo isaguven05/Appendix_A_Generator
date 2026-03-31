@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Appendix A – PPTX Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 860px; margin: 0 auto; }
+
+    header { margin-bottom: 2rem; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f3460; }
+    header p  { margin-top: .35rem; font-size: .9rem; color: #555; }
+
+    /* Flash messages */
+    .flash-list { list-style: none; margin-bottom: 1.2rem; }
+    .flash-list li {
+      padding: .75rem 1rem; border-radius: 6px;
+      margin-bottom: .5rem; font-size: .9rem;
+    }
+    .flash-list li.error   { background: #fde8e8; color: #c0392b; border-left: 4px solid #c0392b; }
+    .flash-list li.success { background: #e8f8e8; color: #27ae60; border-left: 4px solid #27ae60; }
+
+    /* Card sections */
+    .card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 1.5rem 1.75rem; margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1rem; font-weight: 700; color: #0f3460;
+      border-bottom: 2px solid #e8eaf6; padding-bottom: .5rem;
+      margin-bottom: 1.2rem; display: flex; align-items: center; gap: .5rem;
+    }
+
+    .card h2 .badge {
+      background: #0f3460; color: #fff; border-radius: 50%;
+      width: 1.4rem; height: 1.4rem; font-size: .75rem;
+      display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+    @media (max-width: 600px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .field { display: flex; flex-direction: column; gap: .35rem; }
+
+    label {
+      font-size: .82rem; font-weight: 600; color: #333;
+      text-transform: uppercase; letter-spacing: .03em;
+    }
+
+    label .hint {
+      font-weight: 400; color: #888; text-transform: none;
+      letter-spacing: 0; font-size: .78rem;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="file"],
+    textarea {
+      padding: .55rem .75rem; border: 1.5px solid #dde; border-radius: 6px;
+      font-size: .9rem; color: #1a1a2e; background: #fafafa; width: 100%;
+      transition: border-color .15s;
+    }
+
+    input[type="file"] { padding: .4rem .5rem; cursor: pointer; }
+    input:focus, textarea:focus { outline: none; border-color: #0f3460; background: #fff; }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* Provider image routing hint */
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: .6rem;
+      margin-top: .75rem;
+    }
+
+    @media (max-width: 600px) { .provider-grid { grid-template-columns: 1fr; } }
+
+    .provider-pill {
+      display: flex; align-items: center; gap: .5rem;
+      background: #f4f6fb; border: 1.5px solid #dde;
+      border-radius: 8px; padding: .5rem .75rem; font-size: .82rem;
+    }
+
+    .provider-pill .dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+
+    .dot-ee       { background: #e94560; }
+    .dot-three    { background: #f59e0b; }
+    .dot-vodafone { background: #e50000; }
+    .dot-vmo2     { background: #6366f1; }
+
+    /* File list preview */
+    .file-list {
+      margin-top: .5rem; font-size: .8rem; color: #555;
+      list-style: disc inside; max-height: 160px; overflow-y: auto;
+      border: 1px solid #eee; border-radius: 6px;
+      padding: .5rem .75rem; background: #fafafa; display: none;
+    }
+
+    .file-list li.unrecognised { color: #e94560; }
+
+    /* Submit */
+    .submit-wrap { display: flex; justify-content: flex-end; margin-top: .5rem; }
+
+    button[type="submit"] {
+      padding: .75rem 2.5rem; background: #e94560; color: #fff;
+      border: none; border-radius: 8px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: background .15s, transform .1s;
+    }
+
+    button[type="submit"]:hover { background: #c73652; transform: translateY(-1px); }
+
+    #spinner {
+      display: none; align-items: center; gap: .6rem;
+      color: #555; font-size: .9rem; margin-right: 1rem;
+    }
+
+    .spinner-ring {
+      width: 20px; height: 20px; border: 3px solid #dde;
+      border-top-color: #0f3460; border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .info-box {
+      background: #eef3ff; border-left: 4px solid #0f3460;
+      border-radius: 6px; padding: .75rem 1rem;
+      font-size: .85rem; color: #1a1a2e; margin-bottom: 1rem;
+    }
+
+    /* ── Filename guide ── */
+    .guide-section { }
+
+    .guide-section-title {
+      font-size: .95rem; font-weight: 700; color: #0f3460;
+      margin-bottom: .6rem; display: flex; align-items: center; gap: .4rem;
+    }
+
+    .guide-icon { font-size: 1.1rem; }
+    .guide-sub  { font-size: .85rem; color: #555; margin-bottom: .75rem; }
+
+    .guide-table-wrap { overflow-x: auto; }
+
+    .guide-table {
+      width: 100%; border-collapse: collapse; font-size: .83rem;
+    }
+
+    .guide-table th {
+      background: #f0f2f5; text-align: left; padding: .5rem .75rem;
+      font-size: .78rem; text-transform: uppercase; letter-spacing: .04em;
+      color: #555; border-bottom: 2px solid #dde;
+    }
+
+    .guide-table td {
+      padding: .55rem .75rem; border-bottom: 1px solid #eee;
+      vertical-align: top; line-height: 1.6;
+    }
+
+    .guide-table tr:last-child td { border-bottom: none; }
+
+    .row-ee   td:first-child { border-left: 4px solid #e94560; }
+    .row-three td:first-child { border-left: 4px solid #f59e0b; }
+    .row-voda  td:first-child { border-left: 4px solid #e50000; }
+    .row-vmo2  td:first-child { border-left: 4px solid #6366f1; }
+
+    .prov-badge {
+      display: inline-block; padding: .2rem .6rem; border-radius: 4px;
+      font-weight: 700; font-size: .82rem; color: #fff;
+    }
+    .prov-ee    { background: #e94560; }
+    .prov-three { background: #f59e0b; }
+    .prov-voda  { background: #e50000; }
+    .prov-vmo2  { background: #6366f1; }
+
+    .type-badge {
+      display: inline-block; padding: .2rem .55rem; border-radius: 4px;
+      font-size: .8rem; font-weight: 600; white-space: nowrap;
+    }
+    .type-rf { background: #e8f4fd; color: #0f3460; }
+    .type-ga { background: #e8f8e8; color: #1a7a3a; }
+
+    .guide-table code {
+      background: #f4f6fb; padding: .1rem .35rem; border-radius: 3px;
+      font-size: .82rem; color: #0f3460;
+    }
+
+    .eg { color: #555; font-size: .8rem; }
+
+    .warn-section {
+      background: #fff8ed; border-left: 4px solid #f59e0b;
+      border-radius: 6px; padding: .9rem 1rem;
+    }
+
+    .warn-list {
+      margin: .4rem 0 0 1rem; font-size: .85rem; color: #7a3a00;
+      line-height: 1.8;
+    }
+
+    .warn-list code {
+      background: #fdecc8; padding: .1rem .35rem; border-radius: 3px;
+      font-size: .8rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <a href="{{ url_for('home') }}" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:#0f3460;text-decoration:none;margin-bottom:.6rem;font-weight:600;opacity:.75;">← Back to Home</a>
+    <h1>Appendix A – RF Schematics &amp; GA Drawings Generator</h1>
+    <p>Upload your assets and generate all four provider PPTX files in one click.</p>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash-list">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('generate') }}" enctype="multipart/form-data" id="main-form">
+
+    <!-- ① Station 3D Image -->
+    <div class="card">
+      <h2><span class="badge">1</span> Station 3D Image</h2>
+      <div class="field">
+        <label>
+          3D Image file
+          <span class="hint"> — filename must follow: <code>3D_STATIONCODE_STATIONNAME.png</code></span>
+        </label>
+        <input type="file" name="image_3d" accept="image/*" required id="image-3d-input" />
+        <small id="station-preview" style="color:#0f3460;font-weight:600;margin-top:.25rem;"></small>
+      </div>
+    </div>
+
+    <!-- ② Dates -->
+    <div class="card">
+      <h2><span class="badge">2</span> Revision Dates</h2>
+      <div class="grid-2">
+        <div class="field">
+          <label>P01 Date <span class="hint">(e.g. 22/12/2022)</span></label>
+          <input type="text" name="p01_date" placeholder="DD/MM/YYYY" required />
+        </div>
+        <div class="field">
+          <label>P02 Date <span class="hint">(e.g. 08/05/2023)</span></label>
+          <input type="text" name="p02_date" placeholder="DD/MM/YYYY" required />
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ Personnel -->
+    <div class="card">
+      <h2><span class="badge">3</span> Personnel</h2>
+      <div class="grid-3">
+        <div class="field">
+          <label>Author</label>
+          <input type="text" name="author" placeholder="Full name" required />
+        </div>
+        <div class="field">
+          <label>Checked</label>
+          <input type="text" name="checked" placeholder="Full name" required />
+        </div>
+        <div class="field">
+          <label>Approved</label>
+          <input type="text" name="approved" placeholder="Full name" required />
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ Station Address -->
+    <div class="card">
+      <h2><span class="badge">4</span> Station Address</h2>
+      <div class="field">
+        <label>Address</label>
+        <textarea name="station_address" placeholder="Full station address…" required></textarea>
+      </div>
+    </div>
+
+    <!-- ⑤ Filename Guide -->
+    <div class="card">
+      <h2><span class="badge">5</span> Image Filename Guide</h2>
+
+      <p style="font-size:.9rem;color:#444;margin-bottom:1.2rem;">
+        The app reads the <strong>filename</strong> of each image to decide which provider it belongs to
+        and whether it is an <em>RF Schematics</em> slide or a <em>GA Building</em> slide.
+        Follow the rules below — any file that cannot be matched will be flagged in red and skipped.
+      </p>
+
+      <!-- Provider detection -->
+      <div class="guide-section">
+        <div class="guide-section-title">
+          <span class="guide-icon">🏷️</span> STEP 1 — Provider must appear somewhere in the filename
+        </div>
+        <p class="guide-sub">The app accepts any of these formats (case-insensitive):</p>
+
+        <div class="guide-table-wrap">
+          <table class="guide-table">
+            <thead>
+              <tr><th>Provider</th><th>Accepted filename patterns</th><th>Examples</th></tr>
+            </thead>
+            <tbody>
+              <tr class="row-ee">
+                <td><span class="prov-badge prov-ee">EE</span></td>
+                <td>
+                  <code>EE_Station - ...</code><br>
+                  <code>EE - Station - ...</code>
+                </td>
+                <td>
+                  <span class="eg">EE_Temple - Design plan1.jpeg</span><br>
+                  <span class="eg">EE - Lambeth North - Design plan1.jpeg</span>
+                </td>
+              </tr>
+              <tr class="row-three">
+                <td><span class="prov-badge prov-three">THREE</span></td>
+                <td>
+                  <code>THREE_Station - ...</code><br>
+                  <code>Three - Station - ...</code><br>
+                  <code>THREE - Station - ...</code>
+                </td>
+                <td>
+                  <span class="eg">THREE_Temple - Building 1 - Midway.jpeg</span><br>
+                  <span class="eg">Three - Lambeth North - Design plan2.jpeg</span>
+                </td>
+              </tr>
+              <tr class="row-voda">
+                <td><span class="prov-badge prov-voda">VODAFONE</span></td>
+                <td>
+                  <code>VODA_Station - ...</code><br>
+                  <code>VODAFONE_Station - ...</code><br>
+                  <code>Vodafone - Station - ...</code><br>
+                  <code>Station_voda1 - ...</code>
+                </td>
+                <td>
+                  <span class="eg">VODA_Temple - Design plan3.jpeg</span><br>
+                  <span class="eg">Vodafone - Lambeth North - Building 1 - Platforms.jpeg</span><br>
+                  <span class="eg">Lambeth North_voda1 - Design plan5.jpeg</span>
+                </td>
+              </tr>
+              <tr class="row-vmo2">
+                <td><span class="prov-badge prov-vmo2">VMO2</span></td>
+                <td>
+                  <code>VMO2_Station - ...</code><br>
+                  <code>VMO2 - Station - ...</code><br>
+                  <code>Station_VMO2NEW - ...</code>
+                </td>
+                <td>
+                  <span class="eg">VMO2_Temple - Design plan4.jpeg</span><br>
+                  <span class="eg">Lambeth North_VMO2NEW - Design plan6.jpeg</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Slide type detection -->
+      <div class="guide-section" style="margin-top:1.5rem;">
+        <div class="guide-section-title">
+          <span class="guide-icon">📄</span> STEP 2 — Slide type is detected from the filename
+        </div>
+        <p class="guide-sub">After the provider is identified, the app checks the filename for these keywords:</p>
+
+        <div class="guide-table-wrap">
+          <table class="guide-table">
+            <thead>
+              <tr><th>Slide type</th><th>Rule</th><th>Examples</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="type-badge type-rf">📐 RF Schematics</span></td>
+                <td>Filename contains <code>Design plan</code> or <code>Design_plan</code></td>
+                <td>
+                  <span class="eg">EE - Lambeth North - Design plan1.jpeg</span><br>
+                  <span class="eg">THREE_Temple - Design plan2.jpeg</span>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="type-badge type-ga">🏢 GA Building</span></td>
+                <td>Everything else — the last part of the name becomes the slide title</td>
+                <td>
+                  <span class="eg">EE_Temple - Building 1 - <strong>Midway</strong>.jpeg → title: "Midway"</span><br>
+                  <span class="eg">THREE_Temple - Building 1 - <strong>Platform 1&amp;2</strong>.jpeg → title: "Platform 1&amp;2"</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- What doesn't work -->
+      <div class="guide-section warn-section" style="margin-top:1.5rem;">
+        <div class="guide-section-title">
+          <span class="guide-icon">⚠️</span> Files that WILL be skipped (shown in red below)
+        </div>
+        <ul class="warn-list">
+          <li>Files with <strong>no provider keyword</strong> anywhere in the name — e.g. <code>Lambeth North - Building 1 - Basement.jpeg</code></li>
+          <li>Files tagged only with <strong>_DONE</strong>, <strong>_NEW</strong>, <strong>_FINAL</strong> etc. with no EE / THREE / VODA / VMO2 in the name</li>
+        </ul>
+        <p style="margin-top:.6rem;font-size:.83rem;color:#7a3a00;">
+          👉 Simply add the provider name anywhere in the filename to fix this —
+          e.g. rename to <code>EE - Lambeth North - Building 1 - Basement.jpeg</code>
+        </p>
+      </div>
+    </div>
+
+    <!-- ⑥ Images -->
+    <div class="card">
+      <h2><span class="badge">6</span> Upload Images (All Providers)</h2>
+
+      <div class="field">
+        <label>
+          All images
+          <span class="hint"> — select every design plan and building image across all providers at once.</span>
+        </label>
+        <input type="file" name="images" accept="image/*" multiple required id="images-input"
+               onchange="previewFiles(this)" />
+        <ul class="file-list" id="file-list"></ul>
+      </div>
+      <p style="font-size:.8rem;color:#888;margin-top:.5rem;">
+        Each provider generates its own PPTX. If images for all four providers are uploaded you will receive a <strong>.zip</strong> file.
+        Each provider always gets exactly <strong>2 × 2_GA slides</strong>.
+      </p>
+    </div>
+
+    <!-- ⑦ Submit -->
+    <div class="submit-wrap">
+      <div id="spinner"><div class="spinner-ring"></div> Generating…</div>
+      <button type="submit" onclick="showSpinner()">Generate PPTX(s) ↓</button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  document.getElementById("image-3d-input").addEventListener("change", function () {
+    const file = this.files[0];
+    if (!file) return;
+    const stem = file.name.replace(/\.[^.]+$/, "");
+    const parts = stem.split("_");
+    const el = document.getElementById("station-preview");
+    if (parts.length >= 3 && parts[0] === "3D") {
+      el.textContent = `Station: ${parts[1]} – ${parts.slice(2).join("_")}`;
+      el.style.color = "#0f3460";
+    } else {
+      el.textContent = "⚠ Filename should be: 3D_STATIONCODE_STATIONNAME.ext";
+      el.style.color = "#e94560";
+    }
+  });
+
+  /**
+   * Mirrors the Python provider_for() logic exactly.
+   * Pattern 1: PROVIDER_ prefix  (EE_, THREE_, VODA_, VODAFONE_, VMO2_)
+   * Pattern 2: PROVIDER - prefix (EE - , Three - , Vodafone - , Voda - , THREE - , VMO2 - )
+   * Pattern 3: keyword anywhere  (VMO2, VODAFONE, VODA, THREE inside any part of the name)
+   */
+  function getProviderTag(name) {
+    const stem  = name.replace(/\.[^.]+$/, "");   // strip extension
+    const upper = stem.toUpperCase();
+
+    // Pattern 1 – underscore prefix
+    const underscorePrefixes = [
+      ["EE_",       "EE"],
+      ["THREE_",    "THREE"],
+      ["VMO2_",     "VMO2"],
+      ["VODAFONE_", "VODAFONE"],
+      ["VODA_",     "VODAFONE"],
+    ];
+    for (const [pfx, key] of underscorePrefixes) {
+      if (upper.startsWith(pfx)) return key;
+    }
+
+    // Pattern 2 – "PROVIDER - " space-dash-space prefix
+    const spaceDashPrefixes = [
+      ["EE - ",       "EE"],
+      ["THREE - ",    "THREE"],
+      ["VMO2 - ",     "VMO2"],
+      ["VODAFONE - ", "VODAFONE"],
+      ["VODA - ",     "VODAFONE"],
+    ];
+    for (const [pfx, key] of spaceDashPrefixes) {
+      if (upper.startsWith(pfx.toUpperCase())) return key;
+    }
+
+    // Pattern 3 – keyword anywhere (longer/more-specific first)
+    const keywords = [
+      ["VODAFONE", "VODAFONE"],
+      ["VMO2",     "VMO2"],
+      ["THREE",    "THREE"],
+      ["VODA",     "VODAFONE"],
+    ];
+    for (const [kw, key] of keywords) {
+      if (upper.includes(kw)) return key;
+    }
+
+    // EE last — only match as standalone word to avoid false positives
+    if (/(?:^|[\s\-_])EE(?:[\s\-_]|$)/.test(upper)) return "EE";
+
+    return null;
+  }
+
+  function previewFiles(input) {
+    const list = document.getElementById("file-list");
+    list.innerHTML = "";
+    const files = Array.from(input.files);
+    if (!files.length) { list.style.display = "none"; return; }
+
+    files.forEach(f => {
+      const li = document.createElement("li");
+      const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
+      const isDesign = stem.includes("design plan") || stem.includes("design_plan");
+      const prov = getProviderTag(f.name);
+      let tag = "";
+      if (!prov) {
+        li.classList.add("unrecognised");
+        tag = " ⚠ unrecognised prefix";
+      } else {
+        tag = ` [${prov}] ${isDesign ? "📐 RF Schematics" : "🏢 GA Building"}`;
+      }
+      li.textContent = f.name + tag;
+      list.appendChild(li);
+    });
+    list.style.display = "block";
+  }
+
+  function showSpinner() {
+    document.getElementById("spinner").style.display = "flex";
+  }
+</script>
+</body>
+</html>

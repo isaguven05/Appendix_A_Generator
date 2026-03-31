@@ -1,58 +1,100 @@
 """
-Flask web app for Appendix A PPTX automation.
+Flask web app for Appendix A PPTX automation – multi-provider edition.
 """
 
+import io
 import os
-import re
 import uuid
+import zipfile as zipfile_mod
 from pathlib import Path
 
 from flask import (Flask, flash, redirect, render_template, request,
                    send_file, url_for)
 from werkzeug.utils import secure_filename
 
-from generator import detect_ga_count, generate_pptx, sort_design_plans
+from generator import (
+    extract_building_title,
+    extract_station_info,
+    generate_pptx,
+    sort_design_plans,
+)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
-BASE_DIR      = Path(__file__).parent
-TEMPLATE_PPTX = BASE_DIR / "template_A.pptx"
-UPLOAD_DIR    = BASE_DIR / "uploads"
-OUTPUT_DIR    = BASE_DIR / "outputs"
+BASE_DIR   = Path(__file__).parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+OUTPUT_DIR = BASE_DIR / "outputs"
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif"}
-ALLOWED_PPTX_EXT  = {".pptx"}
+
+# Provider → template file + display name
+PROVIDERS = {
+    "EE":       {"template": BASE_DIR / "template_A_EE.pptx",      "label": "EE"},
+    "THREE":    {"template": BASE_DIR / "Template_A_THREE.pptx",    "label": "THREE"},
+    "VODAFONE": {"template": BASE_DIR / "Template_A_VODA.pptx",     "label": "VODAFONE"},
+    "VMO2":     {"template": BASE_DIR / "Template_A_VMO2.pptx",     "label": "VMO2"},
+}
+
+# Image filename prefix → provider key
+PREFIX_MAP = {
+    "EE_":       "EE",
+    "THREE_":    "THREE",
+    "VODAFONE_": "VODAFONE",
+    "VMO2_":     "VMO2",
+}
 
 app = Flask(__name__)
 app.secret_key = "appendix-a-secret"
-app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024   # 200 MB
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024   # 500 MB
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def save_upload(file_obj, subdir: str, filename: str = None) -> Path:
+def save_upload(file_obj, subdir: str, filename: str) -> Path:
     target_dir = UPLOAD_DIR / subdir
     target_dir.mkdir(exist_ok=True)
-    fname = filename or secure_filename(file_obj.filename)
-    path = target_dir / fname
+    path = target_dir / filename
     file_obj.save(str(path))
     return path
 
 
-def classify_images(paths: list):
-    """Split uploaded images into design-plan list and building-image list."""
-    design_plans = []
-    building_imgs = []
-    for p in paths:
-        stem = Path(p).stem.lower()
-        if "design plan" in stem or "design_plan" in stem:
-            design_plans.append(str(p))
+def provider_for(original_name: str):
+    """Return provider key based on filename prefix, or None if unrecognised."""
+    for prefix, key in PREFIX_MAP.items():
+        if original_name.upper().startswith(prefix.upper()):
+            return key
+    return None
+
+
+def split_images_by_provider(img_entries: list) -> dict:
+    """
+    img_entries: list of (saved_path, original_filename)
+    Returns: {provider_key: {"design_plans": [...], "building_imgs": [...], "building_titles": [...]}}
+    """
+    buckets = {
+        key: {"design_plans": [], "building_imgs": [], "building_titles": []}
+        for key in PROVIDERS
+    }
+
+    for saved_path, orig_name in img_entries:
+        prov = provider_for(orig_name)
+        if prov is None:
+            continue   # skip unrecognised prefixes
+        stem_lower = Path(orig_name).stem.lower()
+        if "design plan" in stem_lower or "design_plan" in stem_lower:
+            buckets[prov]["design_plans"].append(str(saved_path))
         else:
-            building_imgs.append(str(p))
-    return sort_design_plans(design_plans), building_imgs
+            buckets[prov]["building_imgs"].append(str(saved_path))
+            buckets[prov]["building_titles"].append(extract_building_title(orig_name))
+
+    # Sort design plans numerically per provider
+    for prov in buckets:
+        buckets[prov]["design_plans"] = sort_design_plans(buckets[prov]["design_plans"])
+
+    return buckets
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -62,38 +104,9 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/detect-ga", methods=["POST"])
-def detect_ga():
-    """AJAX: upload P01 PPTX, return detected GA slide count."""
-    if "p01_file" not in request.files:
-        return {"count": 0, "method": "none"}
-
-    file = request.files["p01_file"]
-    if not file.filename.lower().endswith(".pptx"):
-        return {"count": 0, "method": "invalid"}
-
-    tmp_id = uuid.uuid4().hex
-    tmp_path = UPLOAD_DIR / f"detect_{tmp_id}.pptx"
-    file.save(str(tmp_path))
-
-    try:
-        count = detect_ga_count(str(tmp_path))
-        method = "xml" if count > 0 else "ocr"
-        return {"count": count, "method": method}
-    except Exception as e:
-        return {"count": 0, "error": str(e)}
-    finally:
-        try:
-            tmp_path.unlink()
-        except Exception:
-            pass
-
-
 @app.route("/generate", methods=["POST"])
 def generate():
     session_id = uuid.uuid4().hex
-
-    # ── Validate required fields ──────────────────────────────────────────────
     errors = []
 
     def require_field(name, label):
@@ -109,26 +122,17 @@ def generate():
     approved        = require_field("approved",        "Approved")
     station_address = require_field("station_address", "Station address")
 
-    ga_override_raw = request.form.get("ga_count_override", "").strip()
-    ga_override = int(ga_override_raw) if ga_override_raw.isdigit() else None
-
-    # ── Required files ────────────────────────────────────────────────────────
+    # ── 3D image ──────────────────────────────────────────────────────────────
     image_3d_file = request.files.get("image_3d")
-    p01_file      = request.files.get("p01_file")
-
     if not image_3d_file or not image_3d_file.filename:
         errors.append("3D image is required.")
     elif Path(image_3d_file.filename).suffix.lower() not in ALLOWED_IMAGE_EXT:
         errors.append("3D image must be an image file (PNG, JPG, etc.).")
 
-    if not p01_file or not p01_file.filename:
-        errors.append("Input PPTX (P01) is required.")
-    elif Path(p01_file.filename).suffix.lower() not in ALLOWED_PPTX_EXT:
-        errors.append("Input PPTX must be a .pptx file.")
-
+    # ── Images ────────────────────────────────────────────────────────────────
     image_files = request.files.getlist("images")
     if not image_files or all(not f.filename for f in image_files):
-        errors.append("At least one design/building image is required.")
+        errors.append("At least one image is required.")
 
     if errors:
         for e in errors:
@@ -143,72 +147,91 @@ def generate():
         subdir,
         secure_filename(image_3d_file.filename),
     )
-    p01_path = save_upload(
-        p01_file,
-        subdir,
-        "p01_input.pptx",
-    )
 
-    # Store (saved_path, original_filename) so we can extract titles from the
-    # original name before secure_filename strips characters like '&'.
+    # Store (saved_path, original_name) to preserve '&' etc. in titles
     img_entries = []
     for f in image_files:
         if f.filename and Path(f.filename).suffix.lower() in ALLOWED_IMAGE_EXT:
-            p = save_upload(f, subdir, secure_filename(f.filename))
-            img_entries.append((p, f.filename))
+            saved = save_upload(f, subdir, secure_filename(f.filename))
+            img_entries.append((saved, f.filename))
 
     if not img_entries:
         flash("No valid image files were uploaded.", "error")
         return redirect(url_for("index"))
 
-    img_paths = [p for p, _ in img_entries]
-    design_plans, building_imgs = classify_images(img_paths)
+    buckets = split_images_by_provider(img_entries)
 
-    # Extract building titles from original filenames (secure_filename strips '&' etc.)
-    from generator import extract_building_title
-    building_titles = [
-        extract_building_title(orig)
-        for p, orig in img_entries
-        if str(p) in building_imgs
-    ]
-
-    # ── Generate ──────────────────────────────────────────────────────────────
-    try:
-        output_bytes = generate_pptx(
-            template_path    = str(TEMPLATE_PPTX),
-            input_pptx_path  = str(p01_path),
-            image_3d_path    = str(image_3d_path),
-            p01_date         = p01_date,
-            p02_date         = p02_date,
-            author           = author,
-            checked          = checked,
-            approved         = approved,
-            station_address  = station_address,
-            design_plan_images = design_plans,
-            building_images    = building_imgs,
-            building_titles    = building_titles,
-            ga_count_override  = ga_override,
+    # Validate at least one provider has images
+    active_providers = [k for k, v in buckets.items()
+                        if v["design_plans"] or v["building_imgs"]]
+    if not active_providers:
+        flash(
+            "No images matched a provider prefix (EE_, THREE_, VODAFONE_, VMO2_). "
+            "Please rename your images and try again.",
+            "error",
         )
-    except Exception as exc:
-        flash(f"Generation failed: {exc}", "error")
         return redirect(url_for("index"))
 
-    # ── Save & serve output ───────────────────────────────────────────────────
-    from generator import extract_station_info
+    # ── Generate one PPTX per active provider, zip them ──────────────────────
     try:
-        _, sname, combined = extract_station_info(str(image_3d_path))
-        out_name = f"A – RF Schematics & GA Drawings - {combined}.pptx"
-    except Exception:
-        out_name = "Appendix_A_output.pptx"
+        _, _, combined = extract_station_info(str(image_3d_path))
+    except Exception as exc:
+        flash(f"Could not parse station from 3D image filename: {exc}", "error")
+        return redirect(url_for("index"))
 
-    out_path = OUTPUT_DIR / f"{session_id}.pptx"
-    out_path.write_bytes(output_bytes)
+    zip_buf = io.BytesIO()
+    generated = []
 
+    with zipfile_mod.ZipFile(zip_buf, "w", zipfile_mod.ZIP_DEFLATED) as zf:
+        for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
+            if prov not in active_providers:
+                continue
+            info  = PROVIDERS[prov]
+            bkt   = buckets[prov]
+            try:
+                pptx_bytes = generate_pptx(
+                    template_path      = str(info["template"]),
+                    image_3d_path      = str(image_3d_path),
+                    p01_date           = p01_date,
+                    p02_date           = p02_date,
+                    author             = author,
+                    checked            = checked,
+                    approved           = approved,
+                    station_address    = station_address,
+                    design_plan_images = bkt["design_plans"],
+                    building_images    = bkt["building_imgs"],
+                    building_titles    = bkt["building_titles"],
+                )
+                fname = f"A – RF Schematics & GA Drawings - {combined} - {prov}.pptx"
+                zf.writestr(fname, pptx_bytes)
+                generated.append(prov)
+            except Exception as exc:
+                flash(f"{prov} generation failed: {exc}", "error")
+
+    if not generated:
+        return redirect(url_for("index"))
+
+    zip_buf.seek(0)
+
+    # If only one provider was generated, return the PPTX directly
+    if len(generated) == 1:
+        prov = generated[0]
+        fname = f"A – RF Schematics & GA Drawings - {combined} - {prov}.pptx"
+        with zipfile_mod.ZipFile(io.BytesIO(zip_buf.getvalue())) as zf:
+            pptx_bytes = zf.read(fname)
+        return send_file(
+            io.BytesIO(pptx_bytes),
+            as_attachment=True,
+            download_name=fname,
+            mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+
+    zip_name = f"Appendix_A_{combined}.zip"
     return send_file(
-        str(out_path),
+        zip_buf,
         as_attachment=True,
-        download_name=out_name,
-        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        download_name=zip_name,
+        mimetype="application/zip",
     )
 
 

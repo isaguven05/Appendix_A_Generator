@@ -42,7 +42,7 @@ PROVIDERS = {
 PREFIX_MAP = {
     "EE_":       "EE",
     "THREE_":    "THREE",
-    "VODAFONE_": "VODAFONE",
+    "VODA_":     "VODAFONE",
     "VMO2_":     "VMO2",
 }
 
@@ -166,7 +166,7 @@ def generate():
                         if v["design_plans"] or v["building_imgs"]]
     if not active_providers:
         flash(
-            "No images matched a provider prefix (EE_, THREE_, VODAFONE_, VMO2_). "
+            "No images matched a provider prefix (EE_, THREE_, VODA_, VMO2_). "
             "Please rename your images and try again.",
             "error",
         )

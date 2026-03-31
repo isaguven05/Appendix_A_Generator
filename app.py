@@ -63,10 +63,45 @@ def save_upload(file_obj, subdir: str, filename: str) -> Path:
 
 
 def provider_for(original_name: str):
-    """Return provider key based on filename prefix, or None if unrecognised."""
+    """
+    Return provider key for a filename, or None if unrecognised.
+
+    Tries three patterns in order:
+      1. PROVIDER_ prefix  (e.g. "EE_...", "THREE_...", "VODA_...")
+      2. PROVIDER - prefix (e.g. "EE - ...", "Three - ...", "Vodafone - ...")
+      3. Keyword anywhere  (e.g. "Lambeth North_VMO2NEW", "Lambeth North_voda1")
+    """
+    upper = original_name.upper()
+    stem  = Path(original_name).stem.upper()
+
+    # 1. Underscore-separated prefix  (existing behaviour)
     for prefix, key in PREFIX_MAP.items():
-        if original_name.upper().startswith(prefix.upper()):
+        if upper.startswith(prefix.upper()):
             return key
+
+    # 2. "PROVIDER - " space-dash-space prefix
+    space_dash = {
+        "EE - ":       "EE",
+        "THREE - ":    "THREE",
+        "VODAFONE - ": "VODAFONE",
+        "VODA - ":     "VODAFONE",
+    }
+    for prefix, key in space_dash.items():
+        if upper.startswith(prefix.upper()):
+            return key
+
+    # 3. Keyword anywhere in the stem (handles embedded names like _VMO2NEW, _voda1)
+    #    Order matters: check longer/more-specific keywords first.
+    keyword_map = [
+        ("VODAFONE", "VODAFONE"),
+        ("VMO2",     "VMO2"),
+        ("THREE",    "THREE"),
+        ("VODA",     "VODAFONE"),
+    ]
+    for keyword, key in keyword_map:
+        if keyword in stem:
+            return key
+
     return None
 
 

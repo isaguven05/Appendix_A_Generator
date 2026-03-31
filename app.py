@@ -19,7 +19,7 @@ from generator import (
     generate_pptx,
     sort_design_plans,
 )
-from generator_b import generate_pptx_b
+from generator_b import generate_pptx_b, PROVIDER_CODES as PROVIDER_CODES_B
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -140,6 +140,21 @@ def split_images_by_provider(img_entries: list) -> dict:
     for prov in buckets:
         buckets[prov]["design_plans"] = sort_design_plans(buckets[prov]["design_plans"])
 
+    return buckets
+
+
+def split_rf_images_by_provider(img_entries: list) -> dict:
+    """
+    Appendix B version: groups images by provider only (no design_plan/building split).
+    img_entries: list of (saved_path, original_filename)
+    Returns: {provider_key: [(saved_path, original_filename), ...]}
+    """
+    buckets = {key: [] for key in PROVIDERS}
+    for saved_path, orig_name in img_entries:
+        prov = provider_for(orig_name)
+        if prov is None:
+            continue
+        buckets[prov].append((saved_path, orig_name))
     return buckets
 
 
@@ -318,10 +333,17 @@ def generate_b():
     approved        = require_field("approved",        "Approved")
     station_address = require_field("station_address", "Station address")
 
-    # ── Images ────────────────────────────────────────────────────────────────
+    # ── 3D image ──────────────────────────────────────────────────────────────
+    image_3d_file = request.files.get("image_3d")
+    if not image_3d_file or not image_3d_file.filename:
+        errors.append("3D image is required.")
+    elif Path(image_3d_file.filename).suffix.lower() not in ALLOWED_IMAGE_EXT:
+        errors.append("3D image must be an image file (PNG, JPG, etc.).")
+
+    # ── RF map images ─────────────────────────────────────────────────────────
     image_files = request.files.getlist("images")
     if not image_files or all(not f.filename for f in image_files):
-        errors.append("At least one image is required.")
+        errors.append("At least one RF map image is required.")
 
     if errors:
         for e in errors:
@@ -330,6 +352,13 @@ def generate_b():
 
     # ── Save uploads ──────────────────────────────────────────────────────────
     subdir = session_id
+
+    image_3d_path = save_upload(
+        image_3d_file,
+        subdir,
+        secure_filename(image_3d_file.filename),
+    )
+
     img_entries = []
     for f in image_files:
         if f.filename and Path(f.filename).suffix.lower() in ALLOWED_IMAGE_EXT:
@@ -340,13 +369,13 @@ def generate_b():
         flash("No valid image files were uploaded.", "error")
         return redirect(url_for("appendix_b_page"))
 
-    buckets = split_images_by_provider(img_entries)
+    # ── Split images by provider (no design_plan/GA distinction for B) ────────
+    buckets = split_rf_images_by_provider(img_entries)
 
-    active_providers = [k for k, v in buckets.items()
-                        if v["design_plans"] or v["building_imgs"]]
+    active_providers = [k for k, v in buckets.items() if v]
     if not active_providers:
         flash(
-            "No images matched a provider prefix (EE_, THREE_, VODA_, VMO2_). "
+            "No images matched a provider prefix (EE_, THREE_, VODAFONE_, VMO2_). "
             "Please rename your images and try again.",
             "error",
         )
@@ -356,35 +385,40 @@ def generate_b():
     if not TEMPLATE_B.exists():
         flash(
             "Missing Appendix B template: templateB.pptx. "
-            "Please upload it to the server.",
+            "Please place it in the server app folder.",
             "error",
         )
         return redirect(url_for("appendix_b_page"))
 
+    # ── Station name for output filename ─────────────────────────────────────
+    try:
+        _, _, combined = extract_station_info(str(image_3d_path))
+    except Exception:
+        combined = "UNKNOWN"
+
     # ── Generate one PPTX per active provider ────────────────────────────────
-    zip_buf = io.BytesIO()
+    zip_buf   = io.BytesIO()
     generated = []
 
     with zipfile_mod.ZipFile(zip_buf, "w", zipfile_mod.ZIP_DEFLATED) as zf:
         for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
             if prov not in active_providers:
                 continue
-            bkt  = buckets[prov]
+            entries = buckets[prov]
             try:
                 pptx_bytes = generate_pptx_b(
-                    template_path      = str(TEMPLATE_B),
-                    date               = date,
-                    author             = author,
-                    checked            = checked,
-                    approved           = approved,
-                    address            = station_address,
-                    p01_date           = p01_date,
-                    design_plan_images = bkt["design_plans"],
-                    building_images    = bkt["building_imgs"],
-                    building_titles    = bkt["building_titles"],
-                    provider           = prov,
+                    template_path = str(TEMPLATE_B),
+                    image_3d_path = str(image_3d_path),
+                    date          = date,
+                    p01_date      = p01_date,
+                    author        = author,
+                    checked       = checked,
+                    approved      = approved,
+                    address       = station_address,
+                    image_entries = entries,
+                    provider      = prov,
                 )
-                fname = f"B – RF Predictions - {prov}.pptx"
+                fname = f"B – RF Predictions - {combined} - {prov}.pptx"
                 zf.writestr(fname, pptx_bytes)
                 generated.append(prov)
             except Exception as exc:
@@ -397,7 +431,7 @@ def generate_b():
 
     if len(generated) == 1:
         prov  = generated[0]
-        fname = f"B – RF Predictions - {prov}.pptx"
+        fname = f"B – RF Predictions - {combined} - {prov}.pptx"
         with zipfile_mod.ZipFile(io.BytesIO(zip_buf.getvalue())) as zf:
             pptx_bytes = zf.read(fname)
         return send_file(
@@ -407,10 +441,11 @@ def generate_b():
             mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
 
+    zip_name = f"Appendix_B_{combined}.zip"
     return send_file(
         zip_buf,
         as_attachment=True,
-        download_name="Appendix_B.zip",
+        download_name=zip_name,
         mimetype="application/zip",
     )
 

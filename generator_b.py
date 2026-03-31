@@ -1,32 +1,42 @@
 """
-Core PPTX generation logic for Appendix B automation.
+Core PPTX generation logic for Appendix B.
 
-Slide-building logic is identical to Appendix A (same layout names,
-same image placement, always exactly 2 × 2_GA slides).
+Uses the building logic from engine_b.py (the original engine.py) without
+any modification.  The extraction phase (reading from an input PPTX) is
+skipped — the user uploads RF prediction map images directly, named in the
+format produced by engine_b's extraction phase:
 
-The ONLY difference is the metadata placeholder names and the
-<P> provider-code replacement.
+    PROVIDER_TECH_MHZ_METRIC_BUILDING.png
+    e.g.  EE_LTE_1800_RSRP_TICKET_HALL.png
+
+Provider codes for the <P> placeholder:
+    EE → 2   VODAFONE → 3   VMO2 → 4   THREE → 5
 """
 
 import io
+import os
+import shutil
+import tempfile
 
 from pptx import Presentation
 
-# Reuse all shared helpers from the existing A generator
-from generator import (
-    RF_IMAGE_BOUNDS,
-    GA_IMAGE_BOUNDS,
-    GA_TITLE_BOUNDS,
-    sort_design_plans,
-    extract_building_title,
-    delete_slide,
-    add_image_shape,
-    add_text_box,
-    get_initials,
-    _post_process_pptx,
+# ── Import building helpers from engine_b (unmodified engine.py) ──────────────
+from engine_b import (
+    TEMPLATE_MAP,
+    DEFAULT_BUILDING_ORDER,
+    _make_sort_key,
+    duplicate_slide,
+    update_slide,
+    add_intro_slides,
+    delete_template_slides,
+    replace_in_master,
+    _initials,
 )
 
-# Provider code mapping  (<P> placeholder in Appendix B templates)
+# ── Import XML post-processing from existing generator.py ────────────────────
+from generator import _post_process_pptx, extract_station_info
+
+# Provider code mapping — inserted into <P> placeholder on every slide
 PROVIDER_CODES = {
     "EE":       "2",
     "VODAFONE": "3",
@@ -37,112 +47,173 @@ PROVIDER_CODES = {
 
 def generate_pptx_b(
     template_path: str,
+    image_3d_path: str,
     date: str,
+    p01_date: str,
     author: str,
     checked: str,
     approved: str,
     address: str,
-    p01_date: str,
-    design_plan_images: list,   # file paths sorted by plan number
-    building_images: list,      # file paths
-    building_titles: list = None,  # pre-extracted titles (preserves '&' etc.)
-    provider: str = "",         # e.g. "EE", "THREE", "VODAFONE", "VMO2"
+    image_entries: list,      # [(saved_path, original_name), …] for ONE provider
+    provider: str,
+    building_order: list = None,
+    logo_path: str = None,
 ) -> bytes:
     """
     Generate one Appendix B PPTX for a single provider and return as bytes.
 
-    Output slide order (identical to Appendix A):
-      1  – Title slide
-      2  – Design Change Summary
-      3  – 2_GA slide  (always exactly 2)
-      4  – 2_GA slide
-      5… – RF Schematics slides (one per design plan image)
-      …  – GA slides (one per building image)
+    Slide structure (driven by templateB.pptx + engine_b):
+      Slide 1  – Title slide (3D station image)
+      Slide 2  – Executive summary
+      Slide 3  – Operator logo slide
+      Slides 4+ – RF prediction maps, one per uploaded image, sorted by
+                   tech / frequency / metric and then by building order
 
-    Metadata replacements (Appendix B–specific):
-      <<DATE>>     → date
-      <<AUTHOR>>   → author
-      <<CHECKED>>  → checked
-      <<APPROVED>> → approved
-      <<ADDRESS>>  → address
-      <<P01>>      → p01_date
-      <<P02>>      → date  (same value as <<DATE>>)
-      <D>          → initials of author
-      <C>          → initials of checked
-      <A>          → initials of approved
-      <P>          → provider code (EE→2, VODAFONE→3, VMO2→4, THREE→5)
+    Metadata replacements applied:
+      Via engine_b replace_in_master:
+        <<d>>   → author initials
+        <<c>>   → checked initials
+        <<a>>   → approved initials
+        <<po1>> → P01 date
+        <<po2>> → date  (same value as <<DATE>>)
+
+      Via XML post-processing (_post_process_pptx):
+        <<DATE>>         → date
+        <<AUTHOR>>       → author
+        <<CHECKED>>      → checked
+        <<APPROVED>>     → approved
+        <<ADDRESS>>      → address
+        <<P01>>          → p01_date
+        <<P02>>          → date
+        <<STATION_NAME>> → station code_name (from 3D image filename)
+        <D>              → author initials
+        <C>              → checked initials
+        <A>              → approved initials
+        <P>              → provider code (EE→2, VODAFONE→3, VMO2→4, THREE→5)
+        <NUM>            → auto slide-number field (via _install_slidenum_field)
     """
-    d_ini = get_initials(author)
-    c_ini = get_initials(checked)
-    a_ini = get_initials(approved)
-    provider_code = PROVIDER_CODES.get(provider.upper(), "")
 
-    design_plan_images = sort_design_plans(design_plan_images)
+    # ── Station info from 3D image filename (same method as Appendix A) ───────
+    try:
+        code, name, combined = extract_station_info(image_3d_path)
+        station_display = f"{code} {name}"   # used in engine_b slide replacements
+    except Exception:
+        combined        = "UNKNOWN"
+        station_display = "UNKNOWN"
 
-    # ── Load template ─────────────────────────────────────────────────────────
-    prs = Presentation(template_path)
+    # ── Metadata dict used by engine_b helpers ────────────────────────────────
+    metadata = {
+        "date":     date,
+        "author":   author,
+        "checked":  checked,
+        "approved": approved,
+        "p01_date": p01_date,
+    }
 
-    # Build layout map – first occurrence wins (avoids duplicate-name overwrite)
-    layout_map = {}
-    for lay in prs.slide_layouts:
-        if lay.name not in layout_map:
-            layout_map[lay.name] = lay
+    # ── Parse image entries into provider_slides list ─────────────────────────
+    # Filename format: PROVIDER_TECH_MHZ_METRIC_BUILDING...png
+    # e.g.  EE_LTE_1800_RSRP_TICKET_HALL.png
+    #       [0]  [1]  [2]  [3]    [4+]
+    provider_slides = []
 
-    lay_2ga = layout_map["2_GA"]
-    lay_rf  = layout_map["RF Schematics"]
-    lay_ga  = layout_map["GA"]
+    for saved_path, orig_name in image_entries:
+        stem    = os.path.splitext(orig_name)[0]        # strip extension
+        parts_f = stem.replace(" ", "_").split("_")     # normalise then split
 
-    # Keep slides 0 & 1 (Title + Design Change Summary); delete the rest
-    while len(prs.slides) > 2:
-        delete_slide(prs, 2)
+        # Need at least: PROVIDER TECH MHZ METRIC BUILDING (5 parts minimum)
+        if len(parts_f) < 5:
+            continue
 
-    # ── Always exactly 2 × 2_GA slides ───────────────────────────────────────
-    for _ in range(2):
-        prs.slides.add_slide(lay_2ga)
+        tech     = parts_f[1].upper()
+        mhz      = parts_f[2]
+        metric   = parts_f[3].upper()
+        building = "_".join(parts_f[4:])   # building may be multi-word
+        key      = (tech, mhz, metric)
 
-    # ── RF Schematics slides ──────────────────────────────────────────────────
-    rf_slides = []
-    for img_path in design_plan_images:
-        slide = prs.slides.add_slide(lay_rf)
-        rf_slides.append((slide, img_path))
+        if key not in TEMPLATE_MAP:
+            continue   # unrecognised tech/metric combo — skip
 
-    # ── GA (building) slides ──────────────────────────────────────────────────
-    ga_slides = []
-    for img_path in building_images:
-        slide = prs.slides.add_slide(lay_ga)
-        ga_slides.append((slide, img_path))
+        provider_slides.append(
+            (provider, orig_name, str(saved_path), tech, mhz, metric, building)
+        )
 
-    # ── RF Schematics – insert design plan images ─────────────────────────────
-    for slide, img_path in rf_slides:
-        add_image_shape(slide, RF_IMAGE_BOUNDS, img_path)
+    # ── Sort by tech/freq/metric then building order ──────────────────────────
+    sort_key = _make_sort_key(building_order or DEFAULT_BUILDING_ORDER)
+    provider_slides.sort(key=sort_key)
 
-    # ── GA slides – insert building images and titles ─────────────────────────
-    for idx, (slide, img_path) in enumerate(ga_slides):
-        if building_titles and idx < len(building_titles):
-            bld_title = building_titles[idx]
-        else:
-            bld_title = extract_building_title(img_path)
-        add_image_shape(slide, GA_IMAGE_BOUNDS, img_path)
-        add_text_box(slide, GA_TITLE_BOUNDS, bld_title, font_size_pt=24, bold=True)
+    # ── Build the presentation in a temp dir (engine_b uses file paths) ───────
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = os.path.join(tmpdir, "output.pptx")
 
-    # ── Save to bytes ─────────────────────────────────────────────────────────
-    buf = io.BytesIO()
-    prs.save(buf)
-    pptx_bytes = buf.getvalue()
+        # engine_b's approach: copy template → build on top → delete originals
+        shutil.copy(template_path, out_path)
+        prs  = Presentation(out_path)
+        tmpl = Presentation(template_path)  # read-only reference for duplication
 
-    # ── XML post-processing: Appendix B metadata replacements ────────────────
+        n_template_slides = len(prs.slides)
+
+        # ── Intro slides: title, exec summary, operator logo ──────────────────
+        add_intro_slides(
+            prs, tmpl,
+            threed_image_path = image_3d_path,
+            provider          = provider,
+            logo_path         = logo_path or "",
+            metadata          = metadata,
+        )
+
+        # ── Content slides: one per RF map image ──────────────────────────────
+        for _, _fname, path, tech, mhz, metric, building in provider_slides:
+            tmpl_slide = tmpl.slides[TEMPLATE_MAP[(tech, mhz, metric)]]
+            slide      = duplicate_slide(prs, tmpl_slide)
+            update_slide(slide, path, building, logo_path or "")
+
+        # ── Remove original blank template slides ──────────────────────────────
+        delete_template_slides(prs, n_template_slides)
+
+        # ── Master metadata (engine_b placeholders) ────────────────────────────
+        replace_in_master(prs, {
+            "<<d>>":   _initials(author),
+            "<<c>>":   _initials(checked),
+            "<<a>>":   _initials(approved),
+            "<<po1>>": p01_date,
+            "<<po2>>": date,
+        })
+
+        # ── Save to bytes ──────────────────────────────────────────────────────
+        buf = io.BytesIO()
+        prs.save(buf)
+        pptx_bytes = buf.getvalue()
+
+    # ── XML post-processing: all remaining placeholder replacements ───────────
+    d_ini = _initials(author)
+    c_ini = _initials(checked)
+    a_ini = _initials(approved)
+
     replacements = {
-        "<<DATE>>":     date,
-        "<<AUTHOR>>":   author,
-        "<<CHECKED>>":  checked,
-        "<<APPROVED>>": approved,
-        "<<ADDRESS>>":  address,
-        "<<P01>>":      p01_date,
-        "<<P02>>":      date,      # <<P02>> mirrors <<DATE>> for Appendix B
-        "<D>":          d_ini,
-        "<C>":          c_ini,
-        "<A>":          a_ini,
-        "<P>":          provider_code,
+        # Appendix B specific
+        "<<DATE>>":         date,
+        "<<AUTHOR>>":       author,
+        "<<CHECKED>>":      checked,
+        "<<APPROVED>>":     approved,
+        "<<ADDRESS>>":      address,
+        "<<P01>>":          p01_date,
+        "<<P02>>":          date,
+        # Station name (same method as Appendix A)
+        "<<STATION_NAME>>": combined,
+        # Initials (both formats)
+        "<D>":              d_ini,
+        "<C>":              c_ini,
+        "<A>":              a_ini,
+        "<<d>>":            d_ini,
+        "<<c>>":            c_ini,
+        "<<a>>":            a_ini,
+        "<<po1>>":          p01_date,
+        "<<po2>>":          date,
+        # Provider code
+        "<P>":              PROVIDER_CODES.get(provider.upper(), ""),
+        # engine_b slide-level placeholders
+        "STATION-NAME":     station_display,
+        "OPERATOR-NAME":    provider,
     }
 
     pptx_bytes = _post_process_pptx(pptx_bytes, replacements)

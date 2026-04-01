@@ -27,44 +27,41 @@
     .field { display: flex; flex-direction: column; gap: .35rem; }
     label { font-size: .82rem; font-weight: 600; color: #333; text-transform: uppercase; letter-spacing: .03em; }
     label .hint { font-weight: 400; color: #888; text-transform: none; letter-spacing: 0; font-size: .78rem; }
+    .field-desc { font-size: .8rem; color: #666; margin-top: -.1rem; margin-bottom: .2rem; line-height: 1.5; }
     input[type="text"], input[type="file"], textarea { padding: .55rem .75rem; border: 1.5px solid #dde; border-radius: 6px; font-size: .9rem; color: #1a1a2e; background: #fafafa; width: 100%; transition: border-color .15s; }
     input[type="file"] { padding: .4rem .5rem; cursor: pointer; }
     input:focus, textarea:focus { outline: none; border-color: #6366f1; background: #fff; }
     textarea { resize: vertical; min-height: 60px; }
-    .file-list { margin-top: .5rem; font-size: .8rem; color: #555; list-style: disc inside; max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: .5rem .75rem; background: #fafafa; display: none; }
-    .file-list li.unrecognised { color: #e94560; }
-    .file-list li.bad-format   { color: #d97706; }
     .submit-wrap { display: flex; justify-content: flex-end; margin-top: .5rem; }
     button[type="submit"] { padding: .75rem 2.5rem; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background .15s, transform .1s; }
     button[type="submit"]:hover { background: #4f46e5; transform: translateY(-1px); }
     #spinner { display: none; align-items: center; gap: .6rem; color: #555; font-size: .9rem; margin-right: 1rem; }
     .spinner-ring { width: 20px; height: 20px; border: 3px solid #dde; border-top-color: #6366f1; border-radius: 50%; animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .guide-section-title { font-size: .95rem; font-weight: 700; color: #6366f1; margin-bottom: .6rem; display: flex; align-items: center; gap: .4rem; }
-    .guide-icon { font-size: 1.1rem; }
-    .guide-sub  { font-size: .85rem; color: #555; margin-bottom: .75rem; }
-    .guide-table-wrap { overflow-x: auto; }
-    .guide-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
-    .guide-table th { background: #f0f2f5; text-align: left; padding: .5rem .75rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: #555; border-bottom: 2px solid #dde; }
-    .guide-table td { padding: .55rem .75rem; border-bottom: 1px solid #eee; vertical-align: top; line-height: 1.7; }
-    .guide-table tr:last-child td { border-bottom: none; }
-    .guide-table code { background: #f0effe; padding: .1rem .35rem; border-radius: 3px; font-size: .82rem; color: #6366f1; }
-    .row-ee   td:first-child { border-left: 4px solid #e94560; }
-    .row-three td:first-child { border-left: 4px solid #f59e0b; }
-    .row-voda  td:first-child { border-left: 4px solid #e50000; }
-    .row-vmo2  td:first-child { border-left: 4px solid #6366f1; }
-    .prov-badge { display: inline-block; padding: .2rem .6rem; border-radius: 4px; font-weight: 700; font-size: .82rem; color: #fff; }
-    .prov-ee    { background: #e94560; }
-    .prov-three { background: #f59e0b; }
-    .prov-voda  { background: #e50000; }
-    .prov-vmo2  { background: #6366f1; }
-    .eg { color: #555; font-size: .8rem; }
-    .warn-section { background: #fff8ed; border-left: 4px solid #f59e0b; border-radius: 6px; padding: .9rem 1rem; margin-top: 1.5rem; }
-    .warn-list { margin: .4rem 0 0 1rem; font-size: .85rem; color: #7a3a00; line-height: 1.8; }
-    .warn-list code { background: #fdecc8; padding: .1rem .35rem; border-radius: 3px; font-size: .8rem; }
-    .format-box { background: #f0effe; border: 1.5px solid #c4b5fd; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; font-size: .9rem; }
-    .format-box .pattern { font-family: "SF Mono","Fira Code",monospace; font-size: 1rem; font-weight: 700; color: #4f46e5; display: block; margin-bottom: .4rem; }
-    .format-box .example { font-family: "SF Mono","Fira Code",monospace; font-size: .82rem; color: #666; }
+
+    /* Info / tip boxes */
+    .info-box { background: #eef3ff; border-left: 4px solid #6366f1; border-radius: 6px; padding: .85rem 1rem; font-size: .85rem; color: #1a1a2e; margin-bottom: 1.1rem; line-height: 1.6; }
+    .info-box strong { color: #4f46e5; }
+    .warn-box { background: #fff8ed; border-left: 4px solid #f59e0b; border-radius: 6px; padding: .85rem 1rem; font-size: .85rem; color: #7a3a00; margin-top: 1.1rem; line-height: 1.6; }
+
+    /* Naming guide */
+    .naming-guide { background: #f6f5ff; border: 1.5px solid #c4b5fd; border-radius: 8px; padding: 1rem 1.25rem; margin-top: .9rem; }
+    .naming-guide .pattern { font-family: "SF Mono","Fira Code",monospace; font-size: .95rem; font-weight: 700; color: #4f46e5; display: block; margin-bottom: .5rem; }
+    .naming-guide .parts-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .6rem; }
+    .naming-guide .part { display: flex; flex-direction: column; align-items: center; font-size: .78rem; }
+    .naming-guide .part .box { background: #6366f1; color: #fff; padding: .25rem .55rem; border-radius: 4px; font-family: "SF Mono","Fira Code",monospace; font-weight: 700; font-size: .82rem; margin-bottom: .25rem; }
+    .naming-guide .part .box.sep { background: #c4b5fd; color: #4f46e5; }
+    .naming-guide .part span { color: #555; text-align: center; max-width: 80px; line-height: 1.3; }
+    .naming-guide .example { font-family: "SF Mono","Fira Code",monospace; font-size: .82rem; color: #555; margin-top: .25rem; }
+    .naming-guide .example strong { color: #4f46e5; }
+
+    /* Providers list */
+    .prov-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: .6rem; align-items: center; background: #fafafa; border: 1.5px solid #eee; border-radius: 8px; padding: .6rem .75rem; }
+    .prov-row .field label { font-size: .75rem; }
+
+    /* Output info */
+    .output-pills { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+    .output-pill { background: #f0effe; color: #4f46e5; border: 1px solid #c4b5fd; border-radius: 20px; padding: .25rem .75rem; font-size: .8rem; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -73,7 +70,7 @@
   <header>
     <a href="{{ url_for('home') }}" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:#6366f1;text-decoration:none;margin-bottom:.6rem;font-weight:600;opacity:.75;">← Back to Home</a>
     <h1>Appendix B – RF Predictions Generator</h1>
-    <p>Upload the RF Predictions report and your 3D station image to generate provider PPTX files in one click.</p>
+    <p>Fill in the details below, upload your files, and the tool will automatically build a separate PowerPoint for each mobile network provider.</p>
   </header>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -88,69 +85,110 @@
 
   <form method="POST" action="{{ url_for('generate_b') }}" enctype="multipart/form-data" id="main-form">
 
-    <!-- ① Station 3D Image -->
+    <!-- ① RF Predictions Report -->
     <div class="card">
-      <h2><span class="badge">1</span> Station 3D Image</h2>
+      <h2><span class="badge">1</span> RF Predictions Report</h2>
+
+      <div class="info-box">
+        This is the <strong>Output Maps Report.pptx</strong> produced by the RF prediction tool — the file that contains all the coverage maps for every provider. The tool reads it automatically and sorts the maps into the correct slides.
+      </div>
+
       <div class="field">
-        <label>3D Image file <span class="hint">— filename must follow: <code>3D_STATIONCODE_STATIONNAME.png</code></span></label>
+        <label>Upload the Output Maps Report</label>
+        <input type="file" name="input_pptx" accept=".pptx" required id="pptx-input" />
+        <small id="pptx-preview" style="color:#6366f1;font-weight:600;margin-top:.25rem;"></small>
+      </div>
+
+      <div style="margin-top:.9rem;">
+        <div style="font-size:.8rem;color:#888;line-height:1.7;">
+          <strong style="color:#555;">What happens next:</strong> the tool reads every slide, identifies which provider, technology, frequency and building each map belongs to, then builds one polished PPTX per provider — with slides sorted in the correct order automatically.<br>
+          <strong style="color:#555;">Output:</strong> one PPTX per provider &nbsp;|&nbsp; more than one provider → downloaded as a <strong>.zip</strong> file
+        </div>
+      </div>
+    </div>
+
+    <!-- ② Station 3D Image -->
+    <div class="card">
+      <h2><span class="badge">2</span> Station 3D Image</h2>
+
+      <div class="info-box">
+        This is the 3D aerial photograph or render of the station — it appears on the title slide of every output document. <strong>The filename must follow the format shown below</strong> so the tool can read the station code and name from it automatically.
+      </div>
+
+      <div class="naming-guide">
+        <span class="pattern">3D _ STATIONCODE _ STATIONNAME .png</span>
+        <div class="parts-row">
+          <div class="part"><div class="box">3D</div><span>always starts with this</span></div>
+          <div class="part"><div class="box sep">_</div><span>underscore</span></div>
+          <div class="part"><div class="box">B137</div><span>station code</span></div>
+          <div class="part"><div class="box sep">_</div><span>underscore</span></div>
+          <div class="part"><div class="box">LAMBETH_NORTH</div><span>station name (underscores for spaces)</span></div>
+        </div>
+        <div class="example">e.g. &nbsp;<strong>3D_B137_LAMBETH_NORTH.png</strong> &nbsp;→ appears as "B137 Lambeth North" in the document</div>
+      </div>
+
+      <div class="field" style="margin-top:1rem;">
+        <label>3D Image file</label>
         <input type="file" name="image_3d" accept="image/*" required id="image-3d-input" />
         <small id="station-preview" style="color:#6366f1;font-weight:600;margin-top:.25rem;"></small>
       </div>
     </div>
 
-    <!-- ② Dates -->
+    <!-- ③ Dates -->
     <div class="card">
-      <h2><span class="badge">2</span> Dates</h2>
+      <h2><span class="badge">3</span> Document Dates</h2>
       <div class="grid-2">
         <div class="field">
-          <label>Date <span class="hint">— maps to &lt;&lt;DATE&gt;&gt; and &lt;&lt;P02&gt;&gt;</span></label>
-          <input type="text" name="date" placeholder="DD/MM/YYYY" required />
+          <label>Original Submission Date</label>
+          <p class="field-desc">The date this report was first submitted (P01 — shown in the document revision table)</p>
+          <input type="text" name="p01_date" placeholder="DD/MM/YYYY" required />
         </div>
         <div class="field">
-          <label>P01 Date <span class="hint">— original submission date</span></label>
-          <input type="text" name="p01_date" placeholder="DD/MM/YYYY" required />
+          <label>Current Issue Date</label>
+          <p class="field-desc">Today's date, or the date of this revision (shown on the cover and throughout the document)</p>
+          <input type="text" name="date" placeholder="DD/MM/YYYY" required />
         </div>
       </div>
     </div>
 
-    <!-- ③ Personnel -->
+    <!-- ④ Personnel -->
     <div class="card">
-      <h2><span class="badge">3</span> Personnel</h2>
+      <h2><span class="badge">4</span> Personnel</h2>
+      <p style="font-size:.85rem;color:#555;margin-bottom:1rem;">These names appear in the document title block.</p>
       <div class="grid-3">
         <div class="field">
           <label>Author</label>
           <input type="text" name="author" placeholder="Full name" required />
         </div>
         <div class="field">
-          <label>Checked</label>
+          <label>Checked by</label>
           <input type="text" name="checked" placeholder="Full name" required />
         </div>
         <div class="field">
-          <label>Approved</label>
+          <label>Approved by</label>
           <input type="text" name="approved" placeholder="Full name" required />
         </div>
       </div>
     </div>
 
-    <!-- ④ Address -->
+    <!-- ⑤ Station Address -->
     <div class="card">
-      <h2><span class="badge">4</span> Station Address</h2>
+      <h2><span class="badge">5</span> Station Address</h2>
       <div class="field">
-        <label>Address <span class="hint">— maps to &lt;&lt;ADDRESS&gt;&gt;</span></label>
-        <textarea name="station_address" placeholder="Full station address…" required></textarea>
+        <label>Full station address</label>
+        <p class="field-desc">The complete address of the site — printed on the cover page of each output document.</p>
+        <textarea name="station_address" placeholder="e.g. Lambeth North Station, Westminster Bridge Road, London, SE1 7JY" required></textarea>
       </div>
     </div>
 
-    <!-- ⑤ Providers & Logos -->
+    <!-- ⑥ Providers & Logos -->
     <div class="card">
-      <h2><span class="badge">5</span> Providers &amp; Logos</h2>
-      <p style="font-size:.85rem;color:#555;margin-bottom:1rem;">
-        The app reads provider names directly from the slide text in the uploaded PPTX.
-        Enter the <strong>exact name</strong> as it appears in the report (e.g. <code>EE</code>,
-        <code>Three</code>, <code>Vodafone</code>, <code>VMO2</code>). Optionally upload a logo
-        for each provider — it replaces <code>&lt;&lt;logo&gt;&gt;</code> on every slide.
-        Leave a row blank or delete it to skip that provider.
-      </p>
+      <h2><span class="badge">6</span> Providers &amp; Logos</h2>
+
+      <div class="info-box">
+        The tool generates a separate document for each provider listed here. Enter each provider name <strong>exactly as it appears in the RF Predictions Report</strong> (e.g. <code style="background:#dde5ff;padding:.1rem .35rem;border-radius:3px;color:#4f46e5;">EE</code>, <code style="background:#dde5ff;padding:.1rem .35rem;border-radius:3px;color:#4f46e5;">VODAFONE</code>, <code style="background:#dde5ff;padding:.1rem .35rem;border-radius:3px;color:#4f46e5;">VMO2</code>, <code style="background:#dde5ff;padding:.1rem .35rem;border-radius:3px;color:#4f46e5;">THREE</code>).
+        You can also upload a logo image for each provider — it will be placed on the operator page of that provider's document.
+      </div>
 
       <div id="providers-list" style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem;"></div>
 
@@ -158,27 +196,13 @@
               style="padding:.45rem 1.1rem;background:#ede9fe;color:#4f46e5;border:1.5px solid #c4b5fd;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;">
         + Add Provider
       </button>
-    </div>
 
-    <!-- ⑦ RF Predictions Report -->
-    <div class="card">
-      <h2><span class="badge">6</span> RF Predictions Report</h2>
-      <div class="field">
-        <label>Upload the Output Maps Report <span class="hint">— the PPTX generated by the RF prediction tool</span></label>
-        <input type="file" name="input_pptx" accept=".pptx" required id="pptx-input" />
-        <small id="pptx-preview" style="color:#6366f1;font-weight:600;margin-top:.25rem;"></small>
+      <div class="warn-box" style="margin-top:1rem;">
+        <strong>⚠ Remove any providers not present in the report</strong> — if a provider name isn't found in the uploaded report, no document will be generated for it and it will be silently skipped.
       </div>
-      <p style="font-size:.82rem;color:#888;margin-top:.75rem;">
-        The app reads every slide automatically — extracting the provider, technology, frequency,
-        metric and building from the slide text — then builds one output PPTX per provider.
-        Slides are sorted by technology order then building order.
-        <br><br>
-        <strong>Recognised providers:</strong> EE &nbsp;·&nbsp; Three &nbsp;·&nbsp; Vodafone &nbsp;·&nbsp; VMO2<br>
-        <strong>Output:</strong> one PPTX per provider found &nbsp;|&nbsp; multiple providers → <strong>.zip</strong>
-      </p>
     </div>
 
-    <!-- ⑥ Submit -->
+    <!-- ⑦ Submit -->
     <div class="submit-wrap">
       <div id="spinner"><div class="spinner-ring"></div> Generating…</div>
       <button type="submit" onclick="showSpinner()">Generate PPTX(s) ↓</button>
@@ -198,12 +222,11 @@
     if (parts.length >= 3 && parts[0].toUpperCase() === "3D") {
       const code = parts[1];
       const name = parts.slice(2).join(" ").replace(/_/g," ").replace(/-/g," ");
-      // Title-case each word
       const clean = (code + " " + name).replace(/\b\w/g, c => c.toUpperCase());
-      el.textContent = "✓ Station: " + clean;
+      el.textContent = "✓ Station detected: " + clean;
       el.style.color = "#6366f1";
     } else {
-      el.textContent = "⚠ Filename should be: 3D_STATIONCODE_STATIONNAME.ext";
+      el.textContent = "⚠ Filename doesn't match the required format: 3D_STATIONCODE_STATIONNAME.ext";
       el.style.color = "#e94560";
     }
   });
@@ -229,14 +252,14 @@
 
     row.innerHTML =
       '<div class="field" style="gap:.2rem;">' +
-        '<label style="font-size:.75rem;">Provider name in PPTX</label>' +
-        '<input type="text" name="provider_name_' + idx + '" value="' + (defaultName||"") + '" placeholder="e.g. EE, Vodafone, TEF…" style="text-transform:uppercase;" />' +
+        '<label style="font-size:.75rem;">Provider name (as in report)</label>' +
+        '<input type="text" name="provider_name_' + idx + '" value="' + (defaultName||"") + '" placeholder="e.g. EE, VODAFONE, VMO2…" style="text-transform:uppercase;" />' +
       '</div>' +
       '<div class="field" style="gap:.2rem;">' +
-        '<label style="font-size:.75rem;">Logo image <span style="font-weight:400;color:#aaa;">(optional)</span></label>' +
+        '<label style="font-size:.75rem;">Provider logo <span style="font-weight:400;color:#aaa;">(optional — .png or .jpg)</span></label>' +
         '<input type="file" name="provider_logo_' + idx + '" accept="image/*" />' +
       '</div>' +
-      '<button type="button" title="Remove provider" ' +
+      '<button type="button" title="Remove this provider" ' +
         'style="padding:.4rem .7rem;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;font-size:1rem;font-weight:700;cursor:pointer;line-height:1;margin-top:1.1rem;" ' +
         'onclick="this.closest(\'[data-idx]\').remove()">×</button>';
 

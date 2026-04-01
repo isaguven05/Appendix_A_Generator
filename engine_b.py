@@ -396,9 +396,14 @@ def _fix_run_after_replace(run, old_val, new_val):
                    "[STATIONCODE_STATIONNAME]", "[STATION CODE]"):
         run.font.color.rgb = RGBColor(0, 0, 0)  # Force black
         # Title-case station names (e.g. "LAMBETH_NORTH" → "Lambeth North")
-        # but leave operator names as-is (e.g. "EE" must stay "EE", not "Ee")
+        # For operator names: title-case but keep short all-caps acronyms
+        # uppercase (e.g. "EE" stays "EE" not "Ee"; "THREE" → "Three")
         if old_val == "OPERATOR-NAME":
-            run.text = run.text.replace(new_val, new_val)
+            titled = " ".join(
+                w if (w.isupper() and len(w) <= 3) else w.capitalize()
+                for w in new_val.split()
+            )
+            run.text = run.text.replace(new_val, titled)
         else:
             run.text = run.text.replace(
                 new_val, new_val.replace("_", " ").title()

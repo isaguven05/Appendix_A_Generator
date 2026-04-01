@@ -141,32 +141,23 @@
       </div>
     </div>
 
-    <!-- ⑤ Provider Logos (optional) -->
+    <!-- ⑤ Providers & Logos -->
     <div class="card">
-      <h2><span class="badge">5</span> Provider Logos <span style="font-weight:400;color:#888;font-size:.85rem;">(optional)</span></h2>
-      <p style="font-size:.85rem;color:#555;margin-bottom:1.1rem;">
-        Upload a logo image for each provider you want to include. The logo will replace the
-        <code>&lt;&lt;logo&gt;&gt;</code> placeholder on the operator slide and in the corner of every RF map slide.
-        Leave blank to keep the placeholder text.
+      <h2><span class="badge">5</span> Providers &amp; Logos</h2>
+      <p style="font-size:.85rem;color:#555;margin-bottom:1rem;">
+        The app reads provider names directly from the slide text in the uploaded PPTX.
+        Enter the <strong>exact name</strong> as it appears in the report (e.g. <code>EE</code>,
+        <code>Three</code>, <code>Vodafone</code>, <code>VMO2</code>). Optionally upload a logo
+        for each provider — it replaces <code>&lt;&lt;logo&gt;&gt;</code> on every slide.
+        Leave a row blank or delete it to skip that provider.
       </p>
-      <div class="grid-2">
-        <div class="field">
-          <label><span class="prov-badge prov-ee" style="vertical-align:middle;">EE</span>&nbsp; Logo</label>
-          <input type="file" name="logo_ee" accept="image/*" />
-        </div>
-        <div class="field">
-          <label><span class="prov-badge prov-three" style="vertical-align:middle;">THREE</span>&nbsp; Logo</label>
-          <input type="file" name="logo_three" accept="image/*" />
-        </div>
-        <div class="field">
-          <label><span class="prov-badge prov-voda" style="vertical-align:middle;">VODAFONE</span>&nbsp; Logo</label>
-          <input type="file" name="logo_vodafone" accept="image/*" />
-        </div>
-        <div class="field">
-          <label><span class="prov-badge prov-vmo2" style="vertical-align:middle;">VMO2</span>&nbsp; Logo</label>
-          <input type="file" name="logo_vmo2" accept="image/*" />
-        </div>
-      </div>
+
+      <div id="providers-list" style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem;"></div>
+
+      <button type="button" id="add-provider-btn"
+              style="padding:.45rem 1.1rem;background:#ede9fe;color:#4f46e5;border:1.5px solid #c4b5fd;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;">
+        + Add Provider
+      </button>
     </div>
 
     <!-- ⑦ RF Predictions Report -->
@@ -197,15 +188,19 @@
 </div>
 
 <script>
-  // 3D image preview
+  // ── 3D image preview ──────────────────────────────────────────────────────
   document.getElementById("image-3d-input").addEventListener("change", function () {
     const file = this.files[0];
     if (!file) return;
     const stem  = file.name.replace(/\.[^.]+$/, "");
     const parts = stem.split("_");
     const el    = document.getElementById("station-preview");
-    if (parts.length >= 3 && parts[0] === "3D") {
-      el.textContent = "Station: " + parts[1] + " – " + parts.slice(2).join(" ");
+    if (parts.length >= 3 && parts[0].toUpperCase() === "3D") {
+      const code = parts[1];
+      const name = parts.slice(2).join(" ").replace(/_/g," ").replace(/-/g," ");
+      // Title-case each word
+      const clean = (code + " " + name).replace(/\b\w/g, c => c.toUpperCase());
+      el.textContent = "✓ Station: " + clean;
       el.style.color = "#6366f1";
     } else {
       el.textContent = "⚠ Filename should be: 3D_STATIONCODE_STATIONNAME.ext";
@@ -213,7 +208,7 @@
     }
   });
 
-  // PPTX file preview
+  // ── PPTX file preview ─────────────────────────────────────────────────────
   document.getElementById("pptx-input").addEventListener("change", function () {
     const file = this.files[0];
     const el   = document.getElementById("pptx-preview");
@@ -222,6 +217,38 @@
     el.style.color = "#6366f1";
   });
 
+  // ── Dynamic providers ─────────────────────────────────────────────────────
+  let providerCounter = 0;
+
+  function addProviderRow(defaultName) {
+    const idx      = providerCounter++;
+    const list     = document.getElementById("providers-list");
+    const row      = document.createElement("div");
+    row.dataset.idx = idx;
+    row.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:.6rem;align-items:center;background:#fafafa;border:1.5px solid #eee;border-radius:8px;padding:.6rem .75rem;";
+
+    row.innerHTML =
+      '<div class="field" style="gap:.2rem;">' +
+        '<label style="font-size:.75rem;">Provider name in PPTX</label>' +
+        '<input type="text" name="provider_name_' + idx + '" value="' + (defaultName||"") + '" placeholder="e.g. EE, Vodafone, TEF…" style="text-transform:uppercase;" />' +
+      '</div>' +
+      '<div class="field" style="gap:.2rem;">' +
+        '<label style="font-size:.75rem;">Logo image <span style="font-weight:400;color:#aaa;">(optional)</span></label>' +
+        '<input type="file" name="provider_logo_' + idx + '" accept="image/*" />' +
+      '</div>' +
+      '<button type="button" title="Remove provider" ' +
+        'style="padding:.4rem .7rem;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;font-size:1rem;font-weight:700;cursor:pointer;line-height:1;margin-top:1.1rem;" ' +
+        'onclick="this.closest(\'[data-idx]\').remove()">×</button>';
+
+    list.appendChild(row);
+  }
+
+  // Default providers on load
+  ["EE", "THREE", "VODAFONE", "VMO2"].forEach(name => addProviderRow(name));
+
+  document.getElementById("add-provider-btn").addEventListener("click", () => addProviderRow(""));
+
+  // ── Spinner ───────────────────────────────────────────────────────────────
   function showSpinner() {
     document.getElementById("spinner").style.display = "flex";
   }

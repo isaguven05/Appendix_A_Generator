@@ -49,10 +49,30 @@ PROVIDER_CODES = {
 # masters/layouts, which adds a SECOND field — causing numbers to show doubled
 # (e.g. slide 1 renders as "11").  This version skips that step.
 
+def _strip_num_placeholder(data: bytes) -> bytes:
+    """
+    Remove any residual <NUM> / &lt;NUM&gt; text runs from slide/layout/master XML.
+    The template already has proper <a:fld type="slidenum"/> fields everywhere;
+    these stray <NUM> runs would otherwise leave blank space or confuse renderers.
+    """
+    text = data.decode("utf-8")
+    # Remove the whole <a:r>…<a:t>&lt;NUM&gt;</a:t>…</a:r> run (rPr is optional)
+    text = re.sub(
+        r"<a:r>(?:<a:rPr[^>]*(?:/>|>.*?</a:rPr>))?\s*<a:t>&lt;NUM&gt;</a:t></a:r>",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
+    # Safety: also remove any bare &lt;NUM&gt; that survived the above
+    text = text.replace("&lt;NUM&gt;", "")
+    return text.encode("utf-8")
+
+
 def _b_post_process_pptx(pptx_bytes: bytes, replacements: dict) -> bytes:
     """
     Apply text replacements to all slides, masters and layouts in pptx_bytes.
-    Does NOT inject slide-number fields (templateB has them already).
+    Also strips residual <NUM> placeholder runs.
+    Does NOT inject new slide-number fields (templateB already has them).
     """
     in_buf  = io.BytesIO(pptx_bytes)
     out_buf = io.BytesIO()
@@ -71,7 +91,7 @@ def _b_post_process_pptx(pptx_bytes: bytes, replacements: dict) -> bytes:
                 )
                 if is_master or is_layout or is_slide:
                     data = _replace_in_bytes(data, replacements)
-                # ← no _install_slidenum_field call here
+                    data = _strip_num_placeholder(data)   # ← remove <NUM> runs
 
             zout.writestr(item, data)
 
@@ -242,7 +262,8 @@ def generate_pptx_b(
         "<<ADDRESS>>":      address,
         "<<P01>>":          p01_date,
         "<<P02>>":          date,
-        "<<STATION_NAME>>": combined,
+        # Clean human-readable station name: "B137 Lambeth North" (no underscores)
+        "<<STATION_NAME>>": station_label,
         "<D>":              d_ini,
         "<C>":              c_ini,
         "<A>":              a_ini,

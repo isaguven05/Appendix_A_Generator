@@ -354,18 +354,36 @@ def generate_b():
         secure_filename(input_pptx_file.filename),
     )
 
-    # ── Provider logos (optional) ─────────────────────────────────────────────
-    logos = {}
-    for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
-        logo_file = request.files.get(f"logo_{prov.lower()}")
+    # ── Dynamic providers & logos ─────────────────────────────────────────────
+    # Read provider_name_0 / provider_logo_0 … provider_name_N / provider_logo_N
+    # from the form.  Indices may have gaps (deleted rows); scan 0–29.
+    # Falls back to the default four providers if the user submitted nothing.
+    DEFAULT_B_PROVIDERS = ["THREE", "VODAFONE", "VMO2", "EE"]
+
+    custom_providers = []   # list of {"name": str, "logo": str|None}
+    for i in range(30):
+        pname = request.form.get(f"provider_name_{i}", "").strip().upper()
+        if not pname:
+            continue
+        logo_file = request.files.get(f"provider_logo_{i}")
+        logo_path_val = None
         if logo_file and logo_file.filename:
             ext = Path(logo_file.filename).suffix.lower()
             if ext in ALLOWED_IMAGE_EXT:
-                logo_saved = save_upload(
-                    logo_file, subdir,
-                    f"logo_{prov}{ext}",
-                )
-                logos[prov] = str(logo_saved)
+                logo_saved = save_upload(logo_file, subdir, f"logo_{i}{ext}")
+                logo_path_val = str(logo_saved)
+        custom_providers.append({"name": pname, "logo": logo_path_val})
+
+    if not custom_providers:
+        custom_providers = [{"name": p, "logo": None} for p in DEFAULT_B_PROVIDERS]
+
+    # Sort longer names first so substring matches go in the right direction
+    # (e.g. "VODAFONE" before "VMO2", "THREE" before "EE")
+    b_provider_names = sorted(
+        [p["name"] for p in custom_providers],
+        key=len, reverse=True,
+    )
+    logos = {p["name"]: p["logo"] for p in custom_providers}
 
     # ── Check shared template exists ──────────────────────────────────────────
     if not TEMPLATE_B.exists():
@@ -377,14 +395,12 @@ def generate_b():
         return redirect(url_for("appendix_b_page"))
 
     # ── Extract RF map images from the input PPTX ─────────────────────────────
-    # Pass THREE before EE to avoid "EE" being found inside the word "THREE"
-    b_providers  = ["THREE", "VODAFONE", "VMO2", "EE"]
-    extract_dir  = UPLOAD_DIR / subdir / "extracted"
+    extract_dir = UPLOAD_DIR / subdir / "extracted"
     try:
         extract_pptx_images(
             str(input_pptx_path),
             str(extract_dir),
-            providers=b_providers,
+            providers=b_provider_names,   # user-defined, sorted longest-first
         )
     except Exception as exc:
         flash(f"Failed to read RF Predictions PPTX: {exc}", "error")
@@ -392,7 +408,7 @@ def generate_b():
 
     # ── Build image_entries per provider from extracted files ─────────────────
     buckets = {}
-    for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
+    for prov in b_provider_names:
         prov_dir = extract_dir / prov
         if prov_dir.exists():
             entries = [
@@ -403,7 +419,7 @@ def generate_b():
             if entries:
                 buckets[prov] = entries
 
-    active_providers = [p for p in ["EE", "THREE", "VODAFONE", "VMO2"] if p in buckets]
+    active_providers = [p for p in b_provider_names if p in buckets]
     if not active_providers:
         flash(
             "No RF map slides were recognised in the uploaded PPTX. "
@@ -423,9 +439,7 @@ def generate_b():
     generated = []
 
     with zipfile_mod.ZipFile(zip_buf, "w", zipfile_mod.ZIP_DEFLATED) as zf:
-        for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
-            if prov not in active_providers:
-                continue
+        for prov in active_providers:
             entries = buckets[prov]
             try:
                 pptx_bytes = generate_pptx_b(

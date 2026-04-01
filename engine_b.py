@@ -476,18 +476,9 @@ def replace_logo_in_master(prs, logo_path):
         if is_logo:
             master.shapes._spTree.remove(shape.element)
 
-    # If no logo supplied, just remove the placeholder text — no image added
-    if not logo_path or not os.path.exists(logo_path):
-        return
-
-    # Insert the logo at the exact position and size requested
-    master.shapes.add_picture(
-        logo_path,
-        left   = Pt(1050),
-        top    = Pt(62),
-        width  = Pt(43),
-        height = Pt(43),
-    )
+    # NOTE: python-pptx's MasterShapes does not support add_picture().
+    # The actual logo image is injected at ZIP level by
+    # generator_b._add_logo_to_master_zip() after the presentation is saved.
 
 
 def force_black_runs(slide):

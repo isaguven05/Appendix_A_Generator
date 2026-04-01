@@ -99,6 +99,133 @@ def _b_post_process_pptx(pptx_bytes: bytes, replacements: dict) -> bytes:
     return out_buf.getvalue()
 
 
+# ─── ZIP-level master logo injection ─────────────────────────────────────────
+# python-pptx's MasterShapes does not expose add_picture(), so we manipulate
+# the PPTX zip directly after saving.
+
+def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
+    """
+    Remove the <<logo>> placeholder from the slide master and insert the
+    provider logo at a fixed position so it shows on every slide.
+
+    Fixed position/size (pt → EMU, 1 pt = 12700 EMU):
+      X = 1050 pt → 13 335 000 EMU
+      Y =   62 pt →    787 400 EMU
+      W =   43 pt →    546 100 EMU
+      H =   43 pt →    546 100 EMU
+    """
+    from lxml import etree as _et
+
+    MASTER_XML  = 'ppt/slideMasters/slideMaster1.xml'
+    MASTER_RELS = 'ppt/slideMasters/_rels/slideMaster1.xml.rels'
+    RID         = 'rId_prov_logo'
+    L, T, W, H  = 13_335_000, 787_400, 546_100, 546_100
+
+    P  = 'http://schemas.openxmlformats.org/presentationml/2006/main'
+    A  = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+    R  = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+    IMG_REL = f'{R}/image'
+
+    has_logo = bool(logo_path and os.path.exists(logo_path))
+    if has_logo:
+        with open(logo_path, 'rb') as fh:
+            logo_bytes = fh.read()
+        logo_ext  = os.path.splitext(logo_path)[1].lower()
+        mime      = {'.png': 'image/png', '.jpg': 'image/jpeg',
+                     '.jpeg': 'image/jpeg', '.gif': 'image/gif'}.get(logo_ext, 'image/png')
+        media_zip = f'ppt/media/prov_logo_master{logo_ext}'
+        rel_target = f'../media/prov_logo_master{logo_ext}'
+
+    def _process_master(data: bytes) -> bytes:
+        root    = _et.fromstring(data)
+        spTree  = root.find(f'.//{{{P}}}cSld/{{{P}}}spTree')
+        if spTree is None:
+            spTree = root.find(f'.//{{{P}}}spTree')
+        if spTree is None:
+            return data
+
+        # Remove <<logo>> placeholder shape(s)
+        for sp in list(spTree.findall(f'{{{P}}}sp')):
+            cpr = sp.find(f'.//{{{P}}}nvSpPr/{{{P}}}cNvPr')
+            drop = cpr is not None and 'logo' in (cpr.get('name', '') or '').lower()
+            if not drop:
+                drop = any(
+                    t.text and '<<logo>>' in t.text.lower()
+                    for t in sp.findall(f'.//{{{A}}}t')
+                )
+            if drop:
+                spTree.remove(sp)
+
+        if has_logo:
+            # Build <p:pic> element using lxml (no namespace prefix issues)
+            r_embed = f'{{{R}}}embed'
+            pic     = _et.SubElement(spTree, f'{{{P}}}pic')
+
+            nvPicPr  = _et.SubElement(pic, f'{{{P}}}nvPicPr')
+            cNvPr2   = _et.SubElement(nvPicPr, f'{{{P}}}cNvPr')
+            cNvPr2.set('id', '9997'); cNvPr2.set('name', 'ProviderLogo')
+            cNvPicPr = _et.SubElement(nvPicPr, f'{{{P}}}cNvPicPr')
+            pLocks   = _et.SubElement(cNvPicPr, f'{{{A}}}picLocks')
+            pLocks.set('noChangeAspect', '1')
+            _et.SubElement(nvPicPr, f'{{{P}}}nvPr')
+
+            blipFill = _et.SubElement(pic, f'{{{P}}}blipFill')
+            blip     = _et.SubElement(blipFill, f'{{{A}}}blip')
+            blip.set(r_embed, RID)
+            stretch  = _et.SubElement(blipFill, f'{{{A}}}stretch')
+            _et.SubElement(stretch, f'{{{A}}}fillRect')
+
+            spPr  = _et.SubElement(pic, f'{{{P}}}spPr')
+            xfrm  = _et.SubElement(spPr, f'{{{A}}}xfrm')
+            off   = _et.SubElement(xfrm, f'{{{A}}}off')
+            off.set('x', str(L)); off.set('y', str(T))
+            ext_el = _et.SubElement(xfrm, f'{{{A}}}ext')
+            ext_el.set('cx', str(W)); ext_el.set('cy', str(H))
+            pGeom = _et.SubElement(spPr, f'{{{A}}}prstGeom')
+            pGeom.set('prst', 'rect')
+            _et.SubElement(pGeom, f'{{{A}}}avLst')
+
+        return _et.tostring(root, xml_declaration=True,
+                            encoding='UTF-8', standalone=True)
+
+    def _process_rels(data: bytes) -> bytes:
+        text = data.decode('utf-8')
+        if RID in text:
+            return data
+        rel = (f'<Relationship Id="{RID}" Type="{IMG_REL}" '
+               f'Target="{rel_target}"/>')
+        return text.replace('</Relationships>', rel + '</Relationships>').encode('utf-8')
+
+    def _process_content_types(data: bytes) -> bytes:
+        text    = data.decode('utf-8')
+        ext_bare = logo_ext.lstrip('.')
+        if f'Extension="{ext_bare}"' in text:
+            return data
+        entry = f'<Default Extension="{ext_bare}" ContentType="{mime}"/>'
+        return text.replace('</Types>', entry + '</Types>').encode('utf-8')
+
+    in_buf  = io.BytesIO(pptx_bytes)
+    out_buf = io.BytesIO()
+
+    with _zf.ZipFile(in_buf, 'r') as zin, \
+         _zf.ZipFile(out_buf, 'w', _zf.ZIP_DEFLATED) as zout:
+
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == MASTER_XML:
+                data = _process_master(data)
+            elif item.filename == MASTER_RELS and has_logo:
+                data = _process_rels(data)
+            elif item.filename == '[Content_Types].xml' and has_logo:
+                data = _process_content_types(data)
+            zout.writestr(item, data)
+
+        if has_logo:
+            zout.writestr(media_zip, logo_bytes)
+
+    return out_buf.getvalue()
+
+
 # ─── Main generation function ─────────────────────────────────────────────────
 
 def generate_pptx_b(
@@ -285,6 +412,7 @@ def generate_pptx_b(
     }
 
     pptx_bytes = _b_post_process_pptx(pptx_bytes, replacements)
+    pptx_bytes = _add_logo_to_master_zip(pptx_bytes, logo_path or "")
     return pptx_bytes
 
 

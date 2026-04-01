@@ -262,7 +262,7 @@ def generate():
                     building_images    = bkt["building_imgs"],
                     building_titles    = bkt["building_titles"],
                 )
-                fname = f"A – RF Schematics & GA Drawings - {combined} - {prov}.pptx"
+                fname = f"A – RF Schematics & GA Drawings - {prov}.pptx"
                 zf.writestr(fname, pptx_bytes)
                 generated.append(prov)
             except Exception as exc:
@@ -276,7 +276,7 @@ def generate():
     # If only one provider was generated, return the PPTX directly
     if len(generated) == 1:
         prov = generated[0]
-        fname = f"A – RF Schematics & GA Drawings - {combined} - {prov}.pptx"
+        fname = f"A – RF Schematics & GA Drawings - {prov}.pptx"
         with zipfile_mod.ZipFile(io.BytesIO(zip_buf.getvalue())) as zf:
             pptx_bytes = zf.read(fname)
         return send_file(

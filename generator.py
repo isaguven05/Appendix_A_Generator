@@ -86,7 +86,7 @@ def delete_slide(prs: Presentation, index: int):
 
 
 def add_image_shape(slide, bounds: dict, image_path: str):
-    """Add a picture to slide at given EMU bounds dict."""
+    """Add a picture to slide at given EMU bounds dict (stretches to fill)."""
     slide.shapes.add_picture(
         image_path,
         Emu(bounds["left"]),
@@ -94,6 +94,40 @@ def add_image_shape(slide, bounds: dict, image_path: str):
         Emu(bounds["width"]),
         Emu(bounds["height"]),
     )
+
+
+def _fit_image(img_w, img_h, box_w, box_h):
+    """
+    Scale (img_w × img_h) to fit inside (box_w × box_h) preserving aspect ratio.
+    Returns (scaled_w, scaled_h, left_offset, top_offset) — all in EMUs — so
+    the caller can centre the result inside the box.
+    """
+    scale = min(box_w / img_w, box_h / img_h)
+    w = int(img_w * scale)
+    h = int(img_h * scale)
+    dx = (box_w - w) // 2
+    dy = (box_h - h) // 2
+    return w, h, dx, dy
+
+
+def add_image_fitted(slide, bounds: dict, image_path: str):
+    """
+    Add a picture fitted (aspect-ratio-preserved, centred) inside bounds dict.
+    Uses the same approach as Appendix B's _place_image_fitted / update_slide.
+    """
+    box_left = Emu(bounds["left"])
+    box_top  = Emu(bounds["top"])
+    box_w    = Emu(bounds["width"])
+    box_h    = Emu(bounds["height"])
+
+    # Add temporarily at 0,0 to get python-pptx's natural EMU dimensions
+    tmp = slide.shapes.add_picture(image_path, 0, 0)
+    nat_w, nat_h = tmp.width, tmp.height
+    slide.shapes._spTree.remove(tmp.element)
+
+    w, h, dx, dy = _fit_image(nat_w, nat_h, box_w, box_h)
+    slide.shapes.add_picture(image_path, box_left + dx, box_top + dy,
+                             width=w, height=h)
 
 
 def add_text_box(slide, bounds: dict, text: str, font_size_pt: int = 20,
@@ -262,7 +296,7 @@ def generate_pptx(
 
     # ── RF Schematics slides – insert cable images ────────────────────────────
     for slide, img_path in rf_slides:
-        add_image_shape(slide, RF_IMAGE_BOUNDS, img_path)
+        add_image_fitted(slide, RF_IMAGE_BOUNDS, img_path)
 
     # ── GA slides – insert building images and titles ─────────────────────────
     for idx, (slide, img_path) in enumerate(ga_slides):
@@ -270,7 +304,7 @@ def generate_pptx(
             bld_title = building_titles[idx]
         else:
             bld_title = extract_building_title(img_path)
-        add_image_shape(slide, GA_IMAGE_BOUNDS, img_path)
+        add_image_fitted(slide, GA_IMAGE_BOUNDS, img_path)
         add_text_box(slide, GA_TITLE_BOUNDS, bld_title, font_size_pt=24, bold=True)
 
     # ── Save to bytes ─────────────────────────────────────────────────────────

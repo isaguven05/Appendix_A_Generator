@@ -289,10 +289,21 @@ def generate_pptx(
     # ── Title slide – replace 3D image placeholder ────────────────────────────
     title_slide = prs.slides[0]
     for shape in list(title_slide.shapes):
+        # Remove the placeholder text box AND any background rectangle/image
+        # so the 3D image sits cleanly without anything behind it
         if shape.has_text_frame and "<<3D_IMAGE>>" in shape.text_frame.text:
             shape._element.getparent().remove(shape._element)
-            break
-    add_image_shape(title_slide, TITLE_IMAGE_BOUNDS, image_3d_path)
+        elif shape.shape_type in (1, 13):  # 1=rectangle, 13=picture (background shapes)
+            left, top = shape.left, shape.top
+            bnd_left = TITLE_IMAGE_BOUNDS["left"]
+            bnd_top  = TITLE_IMAGE_BOUNDS["top"]
+            bnd_right  = bnd_left + TITLE_IMAGE_BOUNDS["width"]
+            bnd_bottom = bnd_top  + TITLE_IMAGE_BOUNDS["height"]
+            # Only remove shapes that sit inside or overlap the image area
+            if left >= bnd_left - 200000 and top >= bnd_top - 200000 \
+                    and left <= bnd_right and top <= bnd_bottom:
+                shape._element.getparent().remove(shape._element)
+    add_image_fitted(title_slide, TITLE_IMAGE_BOUNDS, image_3d_path)
 
     # ── RF Schematics slides – insert cable images ────────────────────────────
     for slide, img_path in rf_slides:

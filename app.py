@@ -455,7 +455,7 @@ def generate_b():
                     image_entries = entries,
                     provider      = prov,
                 )
-                fname = f"B – RF Predictions - {combined} - {prov}.pptx"
+                fname = f"B – RF Predictions - {prov}.pptx"
                 zf.writestr(fname, pptx_bytes)
                 generated.append(prov)
             except Exception as exc:
@@ -468,7 +468,7 @@ def generate_b():
 
     if len(generated) == 1:
         prov  = generated[0]
-        fname = f"B – RF Predictions - {combined} - {prov}.pptx"
+        fname = f"B – RF Predictions - {prov}.pptx"
         with zipfile_mod.ZipFile(io.BytesIO(zip_buf.getvalue())) as zf:
             pptx_bytes = zf.read(fname)
         return send_file(

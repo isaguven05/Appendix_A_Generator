@@ -665,7 +665,7 @@ def _set_building_label(slide, building):
             tf = shape.text_frame
             tf.clear()  # Wipe the placeholder text
             run = tf.paragraphs[0].add_run()
-            run.text = building.replace("_", " ")
+            run.text = building.replace("_", " ").title()
             run.font.size = Pt(10)
             # Shrink the font automatically if the text overflows the box
             tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE

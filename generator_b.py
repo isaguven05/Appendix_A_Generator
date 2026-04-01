@@ -119,46 +119,55 @@ def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
     """
     import re as _re
 
-    has_logo = bool(logo_path and os.path.exists(logo_path))
-    if not has_logo:
-        return pptx_bytes
+    # Regex to strip any <p:sp>…</p:sp> block that contains the <<logo>>
+    # placeholder text (escaped as &lt;&lt;logo&gt;&gt; inside XML attributes/bodies).
+    # Applied to master + all layouts unconditionally so the box never shows.
+    _LOGO_SP_RE = _re.compile(
+        r'<p:sp\b[^>]*>(?:(?!</p:sp>).)*?&lt;&lt;logo&gt;&gt;(?:(?!</p:sp>).)*?</p:sp>',
+        _re.DOTALL | _re.IGNORECASE,
+    )
 
-    with open(logo_path, 'rb') as fh:
-        logo_bytes = fh.read()
-    logo_ext   = os.path.splitext(logo_path)[1].lower()
-    mime       = {'.png': 'image/png', '.jpg': 'image/jpeg',
-                  '.jpeg': 'image/jpeg', '.gif': 'image/gif'}.get(logo_ext, 'image/png')
-    media_zip  = f'ppt/media/prov_logo_slide{logo_ext}'
-    # Relative path from a slide's _rels file to the media folder
-    rel_target = f'../media/prov_logo_slide{logo_ext}'
-    IMG_REL    = ('http://schemas.openxmlformats.org/officeDocument/'
-                  '2006/relationships/image')
+    has_logo   = bool(logo_path and os.path.exists(logo_path))
+    logo_bytes = None
+    logo_ext   = None
+    mime       = None
+    media_zip  = None
+    rel_target = None
+    PIC        = ''
+    REL_ENTRY  = ''
     RID        = 'rId_prov_logo'
 
-    L, T, W, H = 13_335_000, 787_400, 546_100, 546_100
-
-    # The <p:pic> XML to inject — uses the same namespace prefixes already
-    # declared in every slide XML so no extra xmlns declarations are needed.
-    PIC = (
-        f'<p:pic>'
-          f'<p:nvPicPr>'
-            f'<p:cNvPr id="9997" name="ProviderLogo"/>'
-            f'<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>'
-            f'<p:nvPr/>'
-          f'</p:nvPicPr>'
-          f'<p:blipFill>'
-            f'<a:blip r:embed="{RID}"/>'
-            f'<a:stretch><a:fillRect/></a:stretch>'
-          f'</p:blipFill>'
-          f'<p:spPr>'
-            f'<a:xfrm><a:off x="{L}" y="{T}"/><a:ext cx="{W}" cy="{H}"/></a:xfrm>'
-            f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
-          f'</p:spPr>'
-        f'</p:pic>'
-    )
-    REL_ENTRY = (
-        f'<Relationship Id="{RID}" Type="{IMG_REL}" Target="{rel_target}"/>'
-    )
+    if has_logo:
+        with open(logo_path, 'rb') as fh:
+            logo_bytes = fh.read()
+        logo_ext   = os.path.splitext(logo_path)[1].lower()
+        mime       = {'.png': 'image/png', '.jpg': 'image/jpeg',
+                      '.jpeg': 'image/jpeg', '.gif': 'image/gif'}.get(logo_ext, 'image/png')
+        media_zip  = f'ppt/media/prov_logo_slide{logo_ext}'
+        rel_target = f'../media/prov_logo_slide{logo_ext}'
+        IMG_REL    = ('http://schemas.openxmlformats.org/officeDocument/'
+                      '2006/relationships/image')
+        L, T, W, H = 13_335_000, 787_400, 546_100, 546_100
+        PIC = (
+            f'<p:pic>'
+              f'<p:nvPicPr>'
+                f'<p:cNvPr id="9997" name="ProviderLogo"/>'
+                f'<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>'
+                f'<p:nvPr/>'
+              f'</p:nvPicPr>'
+              f'<p:blipFill>'
+                f'<a:blip r:embed="{RID}"/>'
+                f'<a:stretch><a:fillRect/></a:stretch>'
+              f'</p:blipFill>'
+              f'<p:spPr>'
+                f'<a:xfrm><a:off x="{L}" y="{T}"/><a:ext cx="{W}" cy="{H}"/></a:xfrm>'
+                f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+              f'</p:spPr>'
+            f'</p:pic>'
+        )
+        REL_ENTRY = (
+            f'<Relationship Id="{RID}" Type="{IMG_REL}" Target="{rel_target}"/>'
+        )
 
     in_buf  = io.BytesIO(pptx_bytes)
     out_buf = io.BytesIO()
@@ -169,6 +178,13 @@ def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
         for item in zin.infolist():
             data = zin.read(item.filename)
             fn   = item.filename
+
+            # ── Master + layouts: strip <<logo>> placeholder shape ───────────
+            if fn == 'ppt/slideMasters/slideMaster1.xml' or \
+               _re.match(r'ppt/slideLayouts/slideLayout\d+\.xml$', fn):
+                text = data.decode('utf-8')
+                text = _LOGO_SP_RE.sub('', text)
+                data = text.encode('utf-8')
 
             # ── Individual slides: inject <p:pic> into spTree ────────────────
             if _re.match(r'ppt/slides/slide\d+\.xml$', fn):
@@ -187,7 +203,7 @@ def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
                 data = text.encode('utf-8')
 
             # ── Content types: register extension if new ─────────────────────
-            elif fn == '[Content_Types].xml':
+            elif fn == '[Content_Types].xml' and has_logo:
                 text     = data.decode('utf-8')
                 ext_bare = logo_ext.lstrip('.')
                 if f'Extension="{ext_bare}"' not in text:
@@ -199,7 +215,8 @@ def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
             zout.writestr(item, data)
 
         # Add the logo image once into the zip
-        zout.writestr(media_zip, logo_bytes)
+        if has_logo:
+            zout.writestr(media_zip, logo_bytes)
 
     return out_buf.getvalue()
 

@@ -172,6 +172,36 @@ def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
     in_buf  = io.BytesIO(pptx_bytes)
     out_buf = io.BytesIO()
 
+    # ── Determine visual slide order from presentation.xml ────────────────────
+    # Slide zip-filenames are NOT necessarily slide1, slide2, slide3 — they
+    # inherit numbers from the original template (e.g. slide19, slide20 …).
+    # Read the presentation's sldIdLst to get the true visual order, then
+    # skip the first 3 (title / exec summary / operator logo slides).
+    with _zf.ZipFile(in_buf, 'r') as _z:
+        _prs_xml  = _z.read('ppt/presentation.xml').decode('utf-8')
+        _rels_xml = _z.read('ppt/_rels/presentation.xml.rels').decode('utf-8')
+
+    _ordered_rids = _re.findall(r'<p:sldId\b[^>]+r:id="([^"]+)"', _prs_xml)
+    _rid_to_slide = {}
+    for _m in _re.finditer(r'Id="([^"]+)"[^>]*Target="([^"]*slides/slide[^"]*)"',
+                           _rels_xml):
+        _rid, _tgt = _m.group(1), _m.group(2)
+        # Normalise "../slides/slideN.xml" or "slides/slideN.xml" → "ppt/slides/slideN.xml"
+        _tgt = _re.sub(r'^(\.\./)+', '', _tgt)
+        if not _tgt.startswith('ppt/'):
+            _tgt = 'ppt/' + _tgt
+        _rid_to_slide[_rid] = _tgt
+
+    _ordered_slides = [_rid_to_slide[r] for r in _ordered_rids if r in _rid_to_slide]
+    # First 3 visual slides must never receive the corner logo
+    _skip_slides = set(_ordered_slides[:3])
+    _skip_rels   = {
+        fn.replace('ppt/slides/', 'ppt/slides/_rels/').replace('.xml', '.xml.rels')
+        for fn in _skip_slides
+    }
+
+    in_buf.seek(0)   # reset for the write pass
+
     with _zf.ZipFile(in_buf, 'r') as zin, \
          _zf.ZipFile(out_buf, 'w', _zf.ZIP_DEFLATED) as zout:
 
@@ -186,20 +216,17 @@ def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
                 text = _LOGO_SP_RE.sub('', text)
                 data = text.encode('utf-8')
 
-            # ── Individual slides: inject <p:pic> into spTree ────────────────
-            # Skip slides 1-3 (title, exec summary, operator logo) — the logo
-            # corner image should only appear on the RF map content slides.
-            _slide_m = _re.match(r'ppt/slides/slide(\d+)\.xml$', fn)
-            if _slide_m and int(_slide_m.group(1)) > 3:
+            # ── Content slides only: inject <p:pic> into spTree ──────────────
+            if _re.match(r'ppt/slides/slide\d+\.xml$', fn) \
+               and fn not in _skip_slides and has_logo:
                 text = data.decode('utf-8')
-                if RID not in text:          # don't double-inject
-                    # Insert just before the closing </p:spTree>
+                if RID not in text:
                     text = text.replace('</p:spTree>', PIC + '</p:spTree>', 1)
                 data = text.encode('utf-8')
 
-            # ── Slide rels: add image relationship (content slides only) ─────
-            elif _re.match(r'ppt/slides/_rels/slide(\d+)\.xml\.rels$', fn) and \
-                 int(_re.search(r'slide(\d+)', fn).group(1)) > 3:
+            # ── Content slide rels: add image relationship ───────────────────
+            elif _re.match(r'ppt/slides/_rels/slide\d+\.xml\.rels$', fn) \
+                 and fn not in _skip_rels and has_logo:
                 text = data.decode('utf-8')
                 if RID not in text:
                     text = text.replace('</Relationships>',

@@ -3,132 +3,167 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Appendix Automation Tool</title>
+  <title>Appendix Automation Tool — Metricell</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      background: #f0f2f5;
+      background: #f0f4f8;
       color: #1a1a2e;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 2rem 1rem;
+      padding: 2.5rem 1rem;
     }
 
-    .hero {
-      text-align: center;
-      margin-bottom: 3rem;
-    }
-
-    .hero .logo-bar {
+    /* ── Top bar ── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: .75rem;
-      margin-bottom: 1.5rem;
+      padding: 0 2rem;
+      z-index: 100;
     }
 
-    .hero .logo-bar .dot-row {
-      display: flex; gap: .4rem;
+    .topbar img {
+      height: 32px;
+      object-fit: contain;
     }
 
-    .dot {
-      width: 12px; height: 12px; border-radius: 50%;
+    .topbar-divider {
+      width: 1px;
+      height: 22px;
+      background: #dde;
+      margin: 0 1rem;
     }
-    .dot-ee       { background: #e94560; }
-    .dot-three    { background: #f59e0b; }
-    .dot-vodafone { background: #e50000; }
-    .dot-vmo2     { background: #6366f1; }
+
+    .topbar-label {
+      font-size: .78rem;
+      font-weight: 600;
+      color: #888;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    /* ── Main content ── */
+    .page-wrap {
+      margin-top: 56px; /* offset for fixed topbar */
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4rem 1rem 3rem;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 3.5rem;
+      max-width: 560px;
+    }
+
+    .hero-logo {
+      width: 200px;
+      margin: 0 auto 2rem;
+      display: block;
+      filter: drop-shadow(0 4px 12px rgba(0,172,193,.18));
+    }
 
     .hero h1 {
-      font-size: 2.2rem;
+      font-size: 2rem;
       font-weight: 800;
       color: #0f3460;
       letter-spacing: -.02em;
-      line-height: 1.15;
+      line-height: 1.2;
+    }
+
+    .hero h1 span {
+      color: #00acc1;
     }
 
     .hero p {
-      margin-top: .75rem;
-      font-size: 1rem;
+      margin-top: .85rem;
+      font-size: .98rem;
       color: #666;
-      max-width: 480px;
-      margin-left: auto;
-      margin-right: auto;
-      line-height: 1.6;
+      line-height: 1.7;
     }
 
+    /* ── Tool cards ── */
     .cards {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1.5rem;
-      max-width: 720px;
+      max-width: 760px;
       width: 100%;
     }
 
-    @media (max-width: 560px) {
+    @media (max-width: 580px) {
       .cards { grid-template-columns: 1fr; }
-      .hero h1 { font-size: 1.7rem; }
+      .hero h1 { font-size: 1.6rem; }
+      .hero-logo { width: 160px; }
     }
 
     .card {
       background: #fff;
-      border-radius: 14px;
-      box-shadow: 0 4px 20px rgba(0,0,0,.09);
-      padding: 2rem 1.75rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.07);
+      padding: 2rem 1.75rem 1.75rem;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 1rem;
+      gap: .9rem;
       text-decoration: none;
       color: inherit;
-      transition: transform .15s, box-shadow .15s;
-      border: 2px solid transparent;
+      transition: transform .18s, box-shadow .18s;
+      border-top: 4px solid transparent;
     }
 
     .card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 28px rgba(0,0,0,.14);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0,0,0,.12);
     }
 
-    .card-a { border-color: #0f3460; }
-    .card-b { border-color: #6366f1; }
+    .card-a { border-top-color: #0f3460; }
+    .card-b { border-top-color: #00acc1; }
 
-    .card-icon {
-      font-size: 2.2rem;
-      line-height: 1;
-    }
-
-    .card-label {
-      font-size: .7rem;
+    .card-tag {
+      font-size: .68rem;
       font-weight: 700;
       letter-spacing: .1em;
       text-transform: uppercase;
-      padding: .2rem .6rem;
-      border-radius: 4px;
+      padding: .25rem .65rem;
+      border-radius: 5px;
       color: #fff;
     }
 
-    .label-a { background: #0f3460; }
-    .label-b { background: #6366f1; }
+    .tag-a { background: #0f3460; }
+    .tag-b { background: #00acc1; }
 
-    .card h2 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: #0f3460;
-      line-height: 1.3;
+    .card-icon {
+      font-size: 2rem;
+      line-height: 1;
     }
 
-    .card-b h2 { color: #6366f1; }
+    .card h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #0f3460;
+      line-height: 1.35;
+    }
+
+    .card-b h2 { color: #007b8a; }
 
     .card p {
       font-size: .85rem;
       color: #666;
-      line-height: 1.6;
+      line-height: 1.65;
       flex: 1;
     }
 
@@ -136,82 +171,100 @@
       display: inline-flex;
       align-items: center;
       gap: .45rem;
-      margin-top: .5rem;
-      padding: .6rem 1.4rem;
-      border-radius: 7px;
-      font-size: .88rem;
+      margin-top: .4rem;
+      padding: .6rem 1.35rem;
+      border-radius: 8px;
+      font-size: .87rem;
       font-weight: 700;
       color: #fff;
       text-decoration: none;
-      transition: opacity .15s;
+      transition: opacity .15s, transform .1s;
     }
 
-    .card-btn:hover { opacity: .88; }
+    .card-btn:hover { opacity: .88; transform: translateX(2px); }
     .btn-a { background: #0f3460; }
-    .btn-b { background: #6366f1; }
+    .btn-b { background: #00acc1; }
 
     .card-btn svg {
-      width: 14px; height: 14px; fill: currentColor;
+      width: 14px; height: 14px; fill: currentColor; flex-shrink: 0;
     }
 
+    /* ── Footer ── */
     footer {
-      margin-top: 3rem;
+      margin-top: 3.5rem;
       font-size: .78rem;
       color: #aaa;
       text-align: center;
+      line-height: 1.8;
     }
+
+    footer strong { color: #888; }
   </style>
 </head>
 <body>
 
-  <div class="hero">
-    <div class="logo-bar">
-      <div class="dot-row">
-        <span class="dot dot-ee"></span>
-        <span class="dot dot-three"></span>
-        <span class="dot dot-vodafone"></span>
-        <span class="dot dot-vmo2"></span>
-      </div>
+  <!-- Fixed top bar with logo -->
+  <div class="topbar">
+    <img src="{{ url_for('static', filename='metricell.jpeg') }}" alt="Metricell" />
+    <div class="topbar-divider"></div>
+    <span class="topbar-label">Internal Tool</span>
+  </div>
+
+  <div class="page-wrap">
+
+    <!-- Hero -->
+    <div class="hero">
+      <img
+        class="hero-logo"
+        src="{{ url_for('static', filename='metricell.jpeg') }}"
+        alt="Metricell logo"
+      />
+      <h1>Appendix <span>Automation</span> Tool</h1>
+      <p>
+        Generate provider-specific PowerPoint appendices for your mobile network
+        projects — from a single upload to polished slides in seconds.
+      </p>
     </div>
-    <h1>Appendix Automation Tool</h1>
-    <p>Generate provider-specific PowerPoint appendices for EE, THREE, VODAFONE and VMO2 from a single upload.</p>
+
+    <!-- Tool cards -->
+    <div class="cards">
+
+      <a class="card card-a" href="{{ url_for('appendix_a_page') }}">
+        <span class="card-tag tag-a">Appendix A</span>
+        <div class="card-icon">📐</div>
+        <h2>RF Schematics &amp; GA Drawings</h2>
+        <p>
+          Upload a 3D station image, design plan images and building photos.
+          The tool generates a complete schematic &amp; drawing deck for each provider.
+        </p>
+        <span class="card-btn btn-a">
+          Open Appendix A
+          <svg viewBox="0 0 16 16"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+        </span>
+      </a>
+
+      <a class="card card-b" href="{{ url_for('appendix_b_page') }}">
+        <span class="card-tag tag-b">Appendix B</span>
+        <div class="card-icon">📡</div>
+        <h2>RF Predictions</h2>
+        <p>
+          Upload an RF Predictions report PPTX and a 3D station image.
+          The tool extracts each provider's RF maps and builds a ready-to-send deck.
+        </p>
+        <span class="card-btn btn-b">
+          Open Appendix B
+          <svg viewBox="0 0 16 16"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+        </span>
+      </a>
+
+    </div>
+
+    <footer>
+      <strong>Metricell</strong> · Internal Tool<br>
+      For internal use only — not for distribution
+    </footer>
+
   </div>
-
-  <div class="cards">
-
-    <!-- Appendix A -->
-    <a class="card card-a" href="{{ url_for('appendix_a_page') }}">
-      <span class="card-label label-a">Appendix A</span>
-      <div class="card-icon">📐</div>
-      <h2>RF Schematics &amp; GA Drawings</h2>
-      <p>
-        Generates RF Schematics and General Arrangement drawing slides.
-        Requires a 3D station image, design plan images, and building photos per provider.
-      </p>
-      <span class="card-btn btn-a">
-        Open Appendix A
-        <svg viewBox="0 0 16 16"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
-      </span>
-    </a>
-
-    <!-- Appendix B -->
-    <a class="card card-b" href="{{ url_for('appendix_b_page') }}">
-      <span class="card-label label-b">Appendix B</span>
-      <div class="card-icon">📡</div>
-      <h2>RF Predictions</h2>
-      <p>
-        Generates RF Prediction slides for each provider.
-        Requires design plan images and building images — no 3D model needed.
-      </p>
-      <span class="card-btn btn-b">
-        Open Appendix B
-        <svg viewBox="0 0 16 16"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
-      </span>
-    </a>
-
-  </div>
-
-  <footer>Boldyn Networks · Internal Tool</footer>
 
 </body>
 </html>

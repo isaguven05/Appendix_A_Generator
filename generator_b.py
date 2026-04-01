@@ -187,15 +187,19 @@ def _add_logo_to_master_zip(pptx_bytes: bytes, logo_path: str) -> bytes:
                 data = text.encode('utf-8')
 
             # ── Individual slides: inject <p:pic> into spTree ────────────────
-            if _re.match(r'ppt/slides/slide\d+\.xml$', fn):
+            # Skip slides 1-3 (title, exec summary, operator logo) — the logo
+            # corner image should only appear on the RF map content slides.
+            _slide_m = _re.match(r'ppt/slides/slide(\d+)\.xml$', fn)
+            if _slide_m and int(_slide_m.group(1)) > 3:
                 text = data.decode('utf-8')
                 if RID not in text:          # don't double-inject
                     # Insert just before the closing </p:spTree>
                     text = text.replace('</p:spTree>', PIC + '</p:spTree>', 1)
                 data = text.encode('utf-8')
 
-            # ── Slide rels: add image relationship ───────────────────────────
-            elif _re.match(r'ppt/slides/_rels/slide\d+\.xml\.rels$', fn):
+            # ── Slide rels: add image relationship (content slides only) ─────
+            elif _re.match(r'ppt/slides/_rels/slide(\d+)\.xml\.rels$', fn) and \
+                 int(_re.search(r'slide(\d+)', fn).group(1)) > 3:
                 text = data.decode('utf-8')
                 if RID not in text:
                     text = text.replace('</Relationships>',

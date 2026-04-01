@@ -262,6 +262,8 @@ def generate_pptx_b(
         "<<ADDRESS>>":      address,
         "<<P01>>":          p01_date,
         "<<P02>>":          date,
+        "<P01>":            p01_date,   # template uses single-bracket form
+        "<P02>":            date,
         # Clean human-readable station name: "B137 Lambeth North" (no underscores)
         "<<STATION_NAME>>": station_label,
         "<D>":              d_ini,

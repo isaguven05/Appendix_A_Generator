@@ -395,9 +395,14 @@ def _fix_run_after_replace(run, old_val, new_val):
     if old_val in ("STATION-NAME", "OPERATOR-NAME",
                    "[STATIONCODE_STATIONNAME]", "[STATION CODE]"):
         run.font.color.rgb = RGBColor(0, 0, 0)  # Force black
-        run.text = run.text.replace(
-            new_val, new_val.replace("_", " ").title()  # "LAMBETH_NORTH" → "Lambeth North"
-        )
+        # Title-case station names (e.g. "LAMBETH_NORTH" → "Lambeth North")
+        # but leave operator names as-is (e.g. "EE" must stay "EE", not "Ee")
+        if old_val == "OPERATOR-NAME":
+            run.text = run.text.replace(new_val, new_val)
+        else:
+            run.text = run.text.replace(
+                new_val, new_val.replace("_", " ").title()
+            )
 
 
 def _initials(name):

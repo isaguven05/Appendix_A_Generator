@@ -28,6 +28,7 @@ from engine_b import (
     add_intro_slides,
     delete_template_slides,
     replace_in_master,
+    replace_logo_in_master,
     _initials,
 )
 
@@ -229,7 +230,7 @@ def generate_pptx_b(
         # ── Remove original blank template slides ─────────────────────────────
         delete_template_slides(prs, n_template_slides)
 
-        # ── Logo: replace <<logo>> on logo slide (slide index 2) ─────────────
+        # ── Logo: big centred logo on operator slide (slide index 2) ────────
         if logo_path and os.path.exists(logo_path):
             from engine_b import replace_logo_placeholder
             logo_slide = list(prs.slides)[2]
@@ -243,6 +244,10 @@ def generate_pptx_b(
             "<<po1>>": p01_date,
             "<<po2>>": date,
         })
+
+        # ── Master logo: replace <<logo>> on slide master so it appears on
+        #    every slide at exactly 1050pt x 62pt, 43×43pt ─────────────────
+        replace_logo_in_master(prs, logo_path or "")
 
         # ── Save to bytes ─────────────────────────────────────────────────────
         buf = io.BytesIO()

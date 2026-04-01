@@ -451,6 +451,45 @@ def replace_in_master(prs, replacements):
                         run.text = run.text.replace(old, new)
 
 
+def replace_logo_in_master(prs, logo_path):
+    """
+    Replace the <<logo>> placeholder on the slide master with the provider
+    logo image at a fixed position, so it appears on ALL slides automatically.
+
+    Fixed position and size (as specified):
+      Left  = 1050 pt   Top    = 62 pt
+      Width =   43 pt   Height = 43 pt
+    """
+    master = prs.slide_master
+
+    # Remove the <<logo>> placeholder shape from the master
+    for shape in list(master.shapes):
+        is_logo = False
+        if shape.name and "logo" in shape.name.lower():
+            is_logo = True
+        elif shape.has_text_frame:
+            try:
+                if "<<logo>>" in shape.text_frame.text.lower():
+                    is_logo = True
+            except Exception:
+                pass
+        if is_logo:
+            master.shapes._spTree.remove(shape.element)
+
+    # If no logo supplied, just remove the placeholder text — no image added
+    if not logo_path or not os.path.exists(logo_path):
+        return
+
+    # Insert the logo at the exact position and size requested
+    master.shapes.add_picture(
+        logo_path,
+        left   = Pt(1050),
+        top    = Pt(62),
+        width  = Pt(43),
+        height = Pt(43),
+    )
+
+
 def force_black_runs(slide):
     """
     Scans every text run on a slide and changes any red text to black.

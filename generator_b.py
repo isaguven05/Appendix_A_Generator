@@ -3,11 +3,7 @@ Core PPTX generation logic for Appendix B.
 
 Uses the building logic from engine_b.py (the original engine.py) without
 any modification.  The extraction phase (reading from an input PPTX) is
-skipped — the user uploads RF prediction map images directly, named in the
-format produced by engine_b's extraction phase:
-
-    PROVIDER_TECH_MHZ_METRIC_BUILDING.png
-    e.g.  EE_LTE_1800_RSRP_TICKET_HALL.png
+handled in app.py via engine_b.process_pptx.
 
 Provider codes for the <P> placeholder:
     EE → 2   VODAFONE → 3   VMO2 → 4   THREE → 5
@@ -15,8 +11,10 @@ Provider codes for the <P> placeholder:
 
 import io
 import os
+import re
 import shutil
 import tempfile
+import zipfile as _zf
 
 from pptx import Presentation
 
@@ -33,8 +31,8 @@ from engine_b import (
     _initials,
 )
 
-# ── Import XML post-processing from existing generator.py ────────────────────
-from generator import _post_process_pptx, extract_station_info
+# ── Import XML helpers from generator.py ─────────────────────────────────────
+from generator import extract_station_info, _replace_in_bytes
 
 # Provider code mapping — inserted into <P> placeholder on every slide
 PROVIDER_CODES = {
@@ -44,6 +42,43 @@ PROVIDER_CODES = {
     "THREE":    "5",
 }
 
+
+# ─── Custom post-processor (no slidenum field injection) ──────────────────────
+# templateB already has proper <a:fld type="slidenum"/> in every layout.
+# _post_process_pptx from generator.py also calls _install_slidenum_field on
+# masters/layouts, which adds a SECOND field — causing numbers to show doubled
+# (e.g. slide 1 renders as "11").  This version skips that step.
+
+def _b_post_process_pptx(pptx_bytes: bytes, replacements: dict) -> bytes:
+    """
+    Apply text replacements to all slides, masters and layouts in pptx_bytes.
+    Does NOT inject slide-number fields (templateB has them already).
+    """
+    in_buf  = io.BytesIO(pptx_bytes)
+    out_buf = io.BytesIO()
+
+    with _zf.ZipFile(in_buf, "r") as zin, \
+         _zf.ZipFile(out_buf, "w", _zf.ZIP_DEFLATED) as zout:
+
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+
+            if item.filename.endswith(".xml"):
+                is_master = "slideMasters/" in item.filename
+                is_layout = "slideLayouts/" in item.filename
+                is_slide  = bool(
+                    re.match(r".*ppt/slides/slide\d+\.xml$", item.filename)
+                )
+                if is_master or is_layout or is_slide:
+                    data = _replace_in_bytes(data, replacements)
+                # ← no _install_slidenum_field call here
+
+            zout.writestr(item, data)
+
+    return out_buf.getvalue()
+
+
+# ─── Main generation function ─────────────────────────────────────────────────
 
 def generate_pptx_b(
     template_path: str,
@@ -66,40 +101,28 @@ def generate_pptx_b(
       Slide 1  – Title slide (3D station image)
       Slide 2  – Executive summary
       Slide 3  – Operator logo slide
-      Slides 4+ – RF prediction maps, one per uploaded image, sorted by
-                   tech / frequency / metric and then by building order
+      Slides 4+ – RF prediction maps, sorted by tech/freq/metric + building
 
-    Metadata replacements applied:
-      Via engine_b replace_in_master:
-        <<d>>   → author initials
-        <<c>>   → checked initials
-        <<a>>   → approved initials
-        <<po1>> → P01 date
-        <<po2>> → date  (same value as <<DATE>>)
-
-      Via XML post-processing (_post_process_pptx):
-        <<DATE>>         → date
-        <<AUTHOR>>       → author
-        <<CHECKED>>      → checked
-        <<APPROVED>>     → approved
-        <<ADDRESS>>      → address
-        <<P01>>          → p01_date
-        <<P02>>          → date
-        <<STATION_NAME>> → station code_name (from 3D image filename)
-        <D>              → author initials
-        <C>              → checked initials
-        <A>              → approved initials
-        <P>              → provider code (EE→2, VODAFONE→3, VMO2→4, THREE→5)
-        <NUM>            → auto slide-number field (via _install_slidenum_field)
+    Metadata replacements:
+      Via engine_b replace_in_master:  <<d>> <<c>> <<a>> <<po1>> <<po2>>
+      Via _b_post_process_pptx:        <<DATE>> <<AUTHOR>> <<CHECKED>>
+                                        <<APPROVED>> <<ADDRESS>> <<P01>>
+                                        <<P02>> <<STATION_NAME>> <D> <C>
+                                        <A> <P>  STATION-NAME  OPERATOR-NAME
     """
 
-    # ── Station info from 3D image filename (same method as Appendix A) ───────
+    # ── Station info from 3D image filename ───────────────────────────────────
     try:
         code, name, combined = extract_station_info(image_3d_path)
-        station_display = f"{code} {name}"   # used in engine_b slide replacements
+        # name may contain underscores (e.g. "LAMBETH_NORTH")
+        name_spaced   = name.replace("_", " ").title()      # "Lambeth North"
+        station_label = f"{code} {name_spaced}"             # "B137 Lambeth North"
     except Exception:
-        combined        = "UNKNOWN"
-        station_display = "UNKNOWN"
+        code          = "UNKNOWN"
+        name          = "UNKNOWN"
+        combined      = "UNKNOWN"
+        name_spaced   = "UNKNOWN"
+        station_label = "UNKNOWN"
 
     # ── Metadata dict used by engine_b helpers ────────────────────────────────
     metadata = {
@@ -112,26 +135,23 @@ def generate_pptx_b(
 
     # ── Parse image entries into provider_slides list ─────────────────────────
     # Filename format: PROVIDER_TECH_MHZ_METRIC_BUILDING...png
-    # e.g.  EE_LTE_1800_RSRP_TICKET_HALL.png
-    #       [0]  [1]  [2]  [3]    [4+]
     provider_slides = []
 
     for saved_path, orig_name in image_entries:
-        stem    = os.path.splitext(orig_name)[0]        # strip extension
-        parts_f = stem.replace(" ", "_").split("_")     # normalise then split
+        stem    = os.path.splitext(orig_name)[0]
+        parts_f = stem.replace(" ", "_").split("_")
 
-        # Need at least: PROVIDER TECH MHZ METRIC BUILDING (5 parts minimum)
         if len(parts_f) < 5:
             continue
 
         tech     = parts_f[1].upper()
         mhz      = parts_f[2]
         metric   = parts_f[3].upper()
-        building = "_".join(parts_f[4:])   # building may be multi-word
+        building = "_".join(parts_f[4:])
         key      = (tech, mhz, metric)
 
         if key not in TEMPLATE_MAP:
-            continue   # unrecognised tech/metric combo — skip
+            continue
 
         provider_slides.append(
             (provider, orig_name, str(saved_path), tech, mhz, metric, building)
@@ -141,25 +161,44 @@ def generate_pptx_b(
     sort_key = _make_sort_key(building_order or DEFAULT_BUILDING_ORDER)
     provider_slides.sort(key=sort_key)
 
-    # ── Build the presentation in a temp dir (engine_b uses file paths) ───────
+    # ── Build the presentation in a temp dir ──────────────────────────────────
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = os.path.join(tmpdir, "output.pptx")
 
-        # engine_b's approach: copy template → build on top → delete originals
         shutil.copy(template_path, out_path)
         prs  = Presentation(out_path)
-        tmpl = Presentation(template_path)  # read-only reference for duplication
+        tmpl = Presentation(template_path)
 
         n_template_slides = len(prs.slides)
+
+        # ── Rename 3D image so add_intro_slides parses it correctly ───────────
+        # add_intro_slides expects:  CODE_NAME_3DMOD.png
+        #   parts[0]     → station code   (e.g. "B137")
+        #   parts[1:-1]  → station name   (e.g. ["LAMBETH", "NORTH"])
+        # Our upload format is  3D_CODE_NAME.png, so parts[0] = "3D" (wrong).
+        # Copy to a temp file with the correct naming before passing it in.
+        threed_name_fixed = f"{code}_{name}_3DMOD.png"
+        threed_path_fixed = os.path.join(tmpdir, threed_name_fixed)
+        shutil.copy(image_3d_path, threed_path_fixed)
 
         # ── Intro slides: title, exec summary, operator logo ──────────────────
         add_intro_slides(
             prs, tmpl,
-            threed_image_path = image_3d_path,
+            threed_image_path = threed_path_fixed,
             provider          = provider,
             logo_path         = logo_path or "",
             metadata          = metadata,
         )
+
+        # ── Fix: place 3D image from GROUP placeholder in title slide ─────────
+        # The template's title slide wraps the image area in a GROUP shape.
+        # add_intro_slides only iterates top-level shapes and searches for
+        # "3D MODEL IMAGE" text — it can't see inside the GROUP, so the image
+        # is never placed.  We handle it here instead.
+        slides_list = list(prs.slides)
+        title_slide = slides_list[n_template_slides]   # first slide added
+
+        _place_3d_image(title_slide, image_3d_path)
 
         # ── Content slides: one per RF map image ──────────────────────────────
         for _, _fname, path, tech, mhz, metric, building in provider_slides:
@@ -167,10 +206,16 @@ def generate_pptx_b(
             slide      = duplicate_slide(prs, tmpl_slide)
             update_slide(slide, path, building, logo_path or "")
 
-        # ── Remove original blank template slides ──────────────────────────────
+        # ── Remove original blank template slides ─────────────────────────────
         delete_template_slides(prs, n_template_slides)
 
-        # ── Master metadata (engine_b placeholders) ────────────────────────────
+        # ── Logo: replace <<logo>> on logo slide (slide index 2) ─────────────
+        if logo_path and os.path.exists(logo_path):
+            from engine_b import replace_logo_placeholder
+            logo_slide = list(prs.slides)[2]
+            replace_logo_placeholder(logo_slide, logo_path, big=True)
+
+        # ── Master metadata (engine_b placeholders) ───────────────────────────
         replace_in_master(prs, {
             "<<d>>":   _initials(author),
             "<<c>>":   _initials(checked),
@@ -179,18 +224,17 @@ def generate_pptx_b(
             "<<po2>>": date,
         })
 
-        # ── Save to bytes ──────────────────────────────────────────────────────
+        # ── Save to bytes ─────────────────────────────────────────────────────
         buf = io.BytesIO()
         prs.save(buf)
         pptx_bytes = buf.getvalue()
 
-    # ── XML post-processing: all remaining placeholder replacements ───────────
+    # ── XML post-processing: remaining placeholder replacements ───────────────
     d_ini = _initials(author)
     c_ini = _initials(checked)
     a_ini = _initials(approved)
 
     replacements = {
-        # Appendix B specific
         "<<DATE>>":         date,
         "<<AUTHOR>>":       author,
         "<<CHECKED>>":      checked,
@@ -198,9 +242,7 @@ def generate_pptx_b(
         "<<ADDRESS>>":      address,
         "<<P01>>":          p01_date,
         "<<P02>>":          date,
-        # Station name (same method as Appendix A)
         "<<STATION_NAME>>": combined,
-        # Initials (both formats)
         "<D>":              d_ini,
         "<C>":              c_ini,
         "<A>":              a_ini,
@@ -209,12 +251,32 @@ def generate_pptx_b(
         "<<a>>":            a_ini,
         "<<po1>>":          p01_date,
         "<<po2>>":          date,
-        # Provider code
         "<P>":              PROVIDER_CODES.get(provider.upper(), ""),
-        # engine_b slide-level placeholders
-        "STATION-NAME":     station_display,
+        "STATION-NAME":     station_label,
         "OPERATOR-NAME":    provider,
     }
 
-    pptx_bytes = _post_process_pptx(pptx_bytes, replacements)
+    pptx_bytes = _b_post_process_pptx(pptx_bytes, replacements)
     return pptx_bytes
+
+
+def _place_3d_image(slide, image_path: str):
+    """
+    Find the GROUP shape on the title slide that contains the 3D image area
+    and replace it with the actual 3D station image.
+
+    The template wraps the image placeholder in a GROUP (named 'Rectangle 5').
+    add_intro_slides can't find it because it only iterates top-level shapes.
+    This function removes the group and inserts the image at the same bounds.
+    If no GROUP shape is found (or no image path given), nothing happens.
+    """
+    if not image_path or not os.path.exists(image_path):
+        return
+
+    for shape in list(slide.shapes):
+        if shape.shape_type == 6:   # 6 = GROUP
+            left, top   = shape.left, shape.top
+            width, height = shape.width, shape.height
+            slide.shapes._spTree.remove(shape.element)
+            slide.shapes.add_picture(image_path, left, top, width=width, height=height)
+            return   # one GROUP per title slide — done

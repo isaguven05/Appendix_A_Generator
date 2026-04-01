@@ -354,6 +354,19 @@ def generate_b():
         secure_filename(input_pptx_file.filename),
     )
 
+    # ── Provider logos (optional) ─────────────────────────────────────────────
+    logos = {}
+    for prov in ["EE", "THREE", "VODAFONE", "VMO2"]:
+        logo_file = request.files.get(f"logo_{prov.lower()}")
+        if logo_file and logo_file.filename:
+            ext = Path(logo_file.filename).suffix.lower()
+            if ext in ALLOWED_IMAGE_EXT:
+                logo_saved = save_upload(
+                    logo_file, subdir,
+                    f"logo_{prov}{ext}",
+                )
+                logos[prov] = str(logo_saved)
+
     # ── Check shared template exists ──────────────────────────────────────────
     if not TEMPLATE_B.exists():
         flash(
@@ -417,6 +430,7 @@ def generate_b():
             try:
                 pptx_bytes = generate_pptx_b(
                     template_path = str(TEMPLATE_B),
+                    logo_path     = logos.get(prov),
                     image_3d_path = str(image_3d_path),
                     date          = date,
                     p01_date      = p01_date,

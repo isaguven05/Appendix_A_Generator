@@ -1,238 +1,103 @@
-# Appendix A – PPTX Generator
+# Metricell Appendix Automation Tool
 
-A web application that automatically builds the **Appendix A – RF Schematics & GA Drawings** PowerPoint from a template. Fill in a short form, upload your files, and download a fully populated `.pptx` in seconds.
-
----
-
-## Option A — Share a Public Link (No Setup for Anyone)
-
-Deploy to **Railway** — free, takes ~5 minutes, and gives you a permanent link like:
-```
-https://appendix-a.up.railway.app
-```
-Anyone can open it in a browser with no installation required.
-
-### Step 1 — Put the project on GitHub
-1. Go to [github.com](https://github.com) and create a free account if you don't have one
-2. Click the **+** icon → **New repository** → name it `appendix-a-automation` → click **Create repository**
-3. Download [GitHub Desktop](https://desktop.github.com/) (easiest way to upload files)
-4. Open GitHub Desktop → **Add an Existing Repository** → select the `APPENDIX_A_AUTOMATION` folder
-5. Click **Publish repository** → make sure **Keep this code private** is ticked → click **Publish**
-
-> The `uploads/` and `outputs/` folders are automatically excluded via `.gitignore`.
-
-### Step 2 — Deploy on Railway
-1. Go to [railway.app](https://railway.app) and sign up with your GitHub account
-2. Click **New Project** → **Deploy from GitHub repo**
-3. Select your `appendix-a-automation` repository
-4. Railway detects Python automatically and deploys — wait ~2 minutes
-5. Click **Settings** → **Networking** → **Generate Domain**
-6. Copy your public URL and share it with anyone
-
-### Step 3 — Updating the App Later
-Whenever you change any code:
-1. Open GitHub Desktop
-2. Write a short message (e.g. "fix building title") and click **Commit**
-3. Click **Push origin**
-4. Railway automatically redeploys within ~1 minute — the link stays the same
-
-> **Cost:** Free for hobby use (500 hours/month). No credit card required.
+A web application that automatically generates PowerPoint appendix decks for mobile network deployment projects. Users fill in a short form, upload their files, and download a ready-made `.pptx` in seconds — replacing a process that previously took around 2.5 hours manually.
 
 ---
 
-## Option B — Run Locally (Just You)
+## What it generates
 
-Use this if you only need the app on your own computer.
-
----
-
-## What You Need Before Starting
-
-| Item | Details |
+| Tool | Output |
 |---|---|
-| **Python 3.9 or newer** | [python.org/downloads](https://www.python.org/downloads/) |
-| **`template_A.pptx`** | Must be in the same folder as `app.py` |
-| **Input P01 `.pptx`** | The existing P01 version of the pack |
-| **3D image** | File named exactly `3D_STATIONCODE_STATIONNAME` (e.g. `3D_DO93_TEMPLE.png`) |
-| **Design plan images** | Named containing `"Design plan"` + a number (e.g. `EE_TEMPLE - Design plan1.jpeg`) |
-| **Building (GA) images** | Named as `ANYTHING - Building X - LOCATION` (e.g. `EE_TEMPLE - Building 1 - Midway.jpeg`) |
-
-> **Image naming matters.** The app reads the slide title directly from the filename, so keep names accurate.
+| **Appendix A** | RF Schematics & GA Drawings deck — one file per provider |
+| **Appendix B** | RF Predictions deck — one file per provider, extracted from an input PPTX |
 
 ---
 
-## Step 1 (Local) — Install Python
+## How it works
 
-### Mac
-1. Open **Terminal** (press `Cmd + Space`, type `Terminal`, press Enter)
-2. Check if Python is already installed:
-   ```
-   python3 --version
-   ```
-   If you see `Python 3.x.x` you're good. If not, download it from [python.org](https://www.python.org/downloads/).
-
-### Windows
-1. Open **Command Prompt** (press `Win + R`, type `cmd`, press Enter)
-2. Check if Python is already installed:
-   ```
-   python --version
-   ```
-   If you see `Python 3.x.x` you're good. If not, download it from [python.org](https://www.python.org/downloads/).
-   > During installation, **tick the box that says "Add Python to PATH"** — this is important!
+1. A user opens the tool in their browser (no install required on their machine)
+2. They fill in metadata (dates, author, station address etc.) and upload their files
+3. The tool generates a fully populated `.pptx` per provider and downloads it automatically
 
 ---
 
-## Step 2 (Local) — Install the Required Libraries
+## Deployment
 
-Open your terminal / command prompt and navigate to the project folder.
+This tool is designed to run on a **Metricell internal server**. Once running, anyone on the network can access it from any browser — no setup needed on their end.
 
-### Mac
+**See [`DEPLOYMENT_GUIDE.md`](./DEPLOYMENT_GUIDE.md) for full step-by-step instructions.**
+
+Quick summary:
+
 ```bash
-cd ~/Downloads/APPENDIX_A_AUTOMATION
-pip3 install flask python-pptx Pillow werkzeug
-```
+# 1. Download the code
+git clone https://github.com/isaguven05/Appendix_A_Generator.git
+cd Appendix_A_Generator
 
-### Windows
-```cmd
-cd %USERPROFILE%\Downloads\APPENDIX_A_AUTOMATION
-pip install flask python-pptx Pillow werkzeug
-```
+# 2. Create a virtual environment and install dependencies
+python3 -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 
-> You only need to do this **once**. After the first install, skip straight to Step 3 next time.
+# 3. Start the server
+# Linux:
+gunicorn --workers 2 --bind 0.0.0.0:5000 app:app
+# Windows:
+waitress-serve --host=0.0.0.0 --port=5000 app:app
+
+# 4. Open in any browser on the network
+http://<server-ip>:5000
+```
 
 ---
 
-## Step 3 (Local) — Start the App
+## Project structure
 
-### Mac
+```
+Appendix_A_Generator/
+├── app.py                  ← Flask routes and request handling
+├── generator.py            ← Appendix A PPTX generation logic
+├── generator_b.py          ← Appendix B PPTX generation logic
+├── engine_b.py             ← Appendix B core engine (slide building, extraction)
+├── requirements.txt        ← Python dependencies
+├── templateB.pptx          ← Appendix B slide template (do not rename)
+├── template_A_EE.pptx      ← Appendix A template — EE
+├── template_A_THREE.pptx   ← Appendix A template — Three
+├── template_A_VODA.pptx    ← Appendix A template — Vodafone
+├── template_A_VMO2.pptx    ← Appendix A template — VMO2
+├── templates/              ← HTML pages (home, Appendix A form, Appendix B form)
+├── static/                 ← Static assets (CSS, logo)
+├── uploads/                ← Temporary upload storage (auto-created)
+└── outputs/                ← Generated files (auto-created)
+```
+
+---
+
+## Updating the app
+
+When a new version is pushed to GitHub, updating takes one command on the server:
+
 ```bash
-cd ~/Downloads/APPENDIX_A_AUTOMATION
-python3 app.py
-```
-
-### Windows
-```cmd
-cd %USERPROFILE%\Downloads\APPENDIX_A_AUTOMATION
-python app.py
-```
-
-You should see something like:
-```
-* Running on http://127.0.0.1:5050
+cd Appendix_A_Generator
+git pull
+sudo systemctl restart appendix-tool   # Linux
+nssm restart AppendixTool              # Windows
 ```
 
 ---
 
-## Step 4 (Local) — Open the App in Your Browser
+## Tech stack
 
-Open any web browser (Chrome, Edge, Safari) and go to:
-
-```
-http://localhost:5050
-```
-
----
-
-## Step 5 (Local & Hosted) — Fill in the Form & Upload Files
-
-| Field | What to enter |
-|---|---|
-| **P01 Date** | Date of the original submission (e.g. `24/01/2025`) |
-| **P02 Date** | Date of the updated design (e.g. `25/03/2025`) |
-| **Author** | Full name of the person who drew it |
-| **Checked** | Full name of the checker |
-| **Approved** | Full name of the approver |
-| **Station Address** | Full station address |
-| **3D Image** | The single 3D render file (`3D_STATIONCODE_NAME.png`) |
-| **Input PPTX (P01)** | The existing P01 pack (used to count GA slides) |
-| **Design & Building Images** | Select **all** images at once — design plans and building images together |
-
-> **Tip (Mac):** Hold `Cmd` to select multiple files.
-> **Tip (Windows):** Hold `Ctrl` to select multiple files.
-
-Click **Generate PPTX** and wait a few seconds. The file will download automatically.
+- **Python 3.9+**
+- **Flask** — web framework
+- **python-pptx** — PowerPoint generation
+- **lxml** — XML manipulation for advanced PPTX operations
+- **Pillow** — image handling
+- **Gunicorn** (Linux) / **Waitress** (Windows) — production WSGI server
 
 ---
 
-## File Naming Rules (Important)
+## Support
 
-The app sorts and categorises images **purely by their filename**, so follow these patterns:
-
-### Design Plan Images
-Must contain `"Design plan"` followed by a number:
-```
-EE_TEMPLE - Design plan1.jpeg
-EE_TEMPLE - Design plan2.jpeg
-EE_TEMPLE - Design plan3.jpeg
-```
-Slides are created in numerical order.
-
-### Building / GA Images
-Must follow the pattern `ANYTHING - Building X - TITLE`:
-```
-EE_TEMPLE - Building 1 - Midway.jpeg
-EE_TEMPLE - Building 1 - Platform 1&2.jpeg
-EE_TEMPLE - Building 1 - Ticket Hall.jpeg
-```
-The **last part after ` - `** becomes the slide title (e.g. `Midway`, `Platform 1&2`).
-
-### 3D Image
-Must start with `3D_`:
-```
-3D_DO93_TEMPLE.png
-```
-The station name is extracted automatically from this filename.
-
----
-
-## Output Slide Order
-
-The generated file always follows this order:
-
-1. **Title slide** — station name + 3D image
-2. **Design Change Summary** — static content with metadata filled in
-3. **2_GA slides** — one per GA drawing found in the P01 input
-4. **RF Schematics slides** — one per Design plan image
-5. **GA slides** — one per Building image
-
----
-
-## Stopping the App
-
-Go back to your terminal / command prompt and press:
-
-```
-Ctrl + C
-```
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| `command not found: python3` | Install Python from [python.org](https://www.python.org/downloads/) and restart your terminal |
-| `ModuleNotFoundError: flask` | Run the `pip install` command from Step 2 again |
-| `Address already in use` | Another program is using port 5050 — restart your computer and try again |
-| Template not found error | Make sure `template_A.pptx` is in the **same folder** as `app.py` |
-| Wrong number of GA slides | Use the **GA Count Override** field on the form to manually set the count |
-| Building title is wrong | Check the filename follows the `ANYTHING - Building X - TITLE` pattern exactly |
-
----
-
-## Folder Structure (Reference)
-
-```
-APPENDIX_A_AUTOMATION/
-├── app.py              ← main application
-├── generator.py        ← PPTX generation logic
-├── template_A.pptx     ← slide template (do not rename)
-├── templates/
-│   └── index.html      ← web form
-├── uploads/            ← temporary upload storage (auto-created)
-└── outputs/            ← generated files (auto-created)
-```
-
----
-
-*For any issues, contact the project maintainer.*
+For issues with the application, contact the original developer.
+For server or infrastructure issues, contact Metricell IT.
